@@ -1,0 +1,134 @@
+﻿﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Lab2_2_Semestr
+{
+    // Класс, представляющий пользователя
+    public class User
+    {
+        public int Id { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+
+        public string Password { get; set; }
+        
+        bool IsAdmin { get; set; }
+    }
+
+    // Класс, представляющий сообщение
+    public class Message
+    {
+        public int Id { get; set; }
+        public int SenderId { get; set; }
+        public int ReceiverId { get; set; }
+        public string Content { get; set; }
+        public DateTime Timestamp { get; set; }
+        // Дополнительные свойства, например, статус прочтения сообщения
+    }
+
+    // Класс, управляющий хранением пользователей и сообщений
+    public class MessengerRepository
+    {
+        private List<User> users;
+        private List<Message> messages;
+
+        public MessengerRepository()
+        {
+            users = new List<User>();
+            messages = new List<Message>();
+        }
+
+        public void AddUser(User user)
+        {
+            users.Add(user);
+        }
+
+        public void SendMessage(Message message)
+        {
+            messages.Add(message);
+        }
+
+        // Другие методы для работы с пользователями и сообщениями
+    }
+
+    // Класс, отвечающий за логику бизнес-процессов мессенджера
+    public class MessengerService
+    {
+        private MessengerRepository repository;
+
+        public MessengerService(MessengerRepository repository)
+        {
+            this.repository = repository;
+        }
+
+        public void RegisterUser(User user)
+        {
+            repository.AddUser(user);
+        }
+
+        public void SendUserMessage(Message message)
+        {
+            repository.SendMessage(message);
+        }
+
+        // Другие методы для работы с пользователями и сообщениями
+    }
+
+    public class UserSession
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string Token { get; set; }
+        public DateTime ExpiryDate { get; set; }
+    }
+
+    // Класс, отвечающий за авторизацию пользователя
+    public class AuthService
+    {
+        private MessengerRepository repository;
+        private List<UserSession> userSessions;
+
+        public AuthService(MessengerRepository repository)
+        {
+            this.repository = repository;
+            userSessions = new List<UserSession>();
+        }
+
+        public bool AuthenticateUser(string username, string password)
+        {
+            User user = repository.GetUsers().FirstOrDefault(u => u.Username == username && u.Password == password);
+
+            if (user != null)
+            {
+                // Создание и сохранение новой сессии для пользователя
+                UserSession session = new UserSession
+                {
+                    UserId = user.Id,
+                    Token = Guid.NewGuid().ToString(),
+                    ExpiryDate = DateTime.Now.AddHours(1)
+                };
+
+                userSessions.Add(session);
+                return true;
+            }
+
+            return false;
+        }
+
+        public bool VerifyUserSession(string token)
+        {
+            UserSession session = userSessions.FirstOrDefault(s => s.Token == token && s.ExpiryDate > DateTime.Now);
+            return session != null;
+        }
+
+        public void LogoutUser(string token)
+        {
+            userSessions.RemoveAll(s => s.Token == token);
+        }
+
+        // Другие методы для работы с авторизацией и сессиями пользователей
+    }
+}
