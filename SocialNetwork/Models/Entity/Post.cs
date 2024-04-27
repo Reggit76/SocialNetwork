@@ -1,6 +1,6 @@
 ﻿using System.Xml.Linq;
 
-namespace SocialNetwork.Models
+namespace SocialNetwork.Models.Entity
 {
     public class Post
     {

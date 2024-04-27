@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 
-namespace SocialNetwork.Models
+namespace SocialNetwork.Models.Entity
 {
     public class Message
     {
