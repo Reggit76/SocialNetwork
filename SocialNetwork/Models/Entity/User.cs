@@ -8,17 +8,17 @@ namespace SocialNetwork.Models.Entity
         public int Id { get; set; }
         public string Username { get; set; }
         public string Email { get; set; }
-        public string PasswordHash { get; set; }
 
         public User()
         {
+            Username = string.Empty;
+            Email = string.Empty;
         }
 
-        public User(string username, string email, string passwordHash)
+        public User(string username, string email)
         {
             Username = username;
             Email = email;
-            PasswordHash = passwordHash;
         }
     }
 }

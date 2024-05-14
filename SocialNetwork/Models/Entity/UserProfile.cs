@@ -17,7 +17,6 @@
     public class UserProfile
     {
         public int UserId { get; set; }
-        public int UserProfileId { get; set; }
         public string FullName { get; set; }
         public Gender Bio { get; set; }
         public DateTime DateOfBirth { get; set; }
@@ -29,6 +28,7 @@
             FullName = string.Empty;
             Bio = Gender.Hidden;
             Role = UserRole.RegularUser; // Установить обычного пользователя по умолчанию
+            ProfilePictureUrl = "../../images/Avatar/default.jpg";
         }
 
         public UserProfile(string fullName, Gender bio, DateTime dateOfBirth, UserRole role = UserRole.RegularUser)
@@ -37,6 +37,7 @@
             Bio = bio;
             DateOfBirth = dateOfBirth;
             Role = role;
+            ProfilePictureUrl = "../../images/Avatar/default.jpg";
         }
     }
 }
