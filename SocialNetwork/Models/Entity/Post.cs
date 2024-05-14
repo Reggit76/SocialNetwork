@@ -21,13 +21,4 @@
             Tags = tags ?? new List<PostTag>(); // Инициализация пустым списком, если теги не предоставлены
         }
     }
-
-    public enum PostTag
-    {
-        Sport,
-        Game,
-        Blog,
-        Studying,
-        Music
-    }
 }

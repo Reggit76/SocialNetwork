@@ -1,20 +1,6 @@
 ﻿namespace SocialNetwork.Models.Entity
 {
-    public enum UserRole
-    {
-        RegularUser, // Обычный пользователь
-        Moderator, // Модератор
-        Administrator // Администратор
-    }
-
-    public enum Gender
-    {
-        Male, // Мужчина
-        Female, // Женщина
-        Hidden // Скрыт 
-    }
-
-    public class UserProfile
+        public class UserProfile
     {
         public int UserId { get; set; }
         public string FullName { get; set; }
