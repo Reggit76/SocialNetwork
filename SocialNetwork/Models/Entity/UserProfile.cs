@@ -7,7 +7,9 @@
         public Gender Bio { get; set; }
         public DateTime DateOfBirth { get; set; }
         public string ProfilePictureUrl { get; set; }
-        public UserRole Role { get; set; } // Добавлено поле роли
+        public UserRole Role { get; set; }
+
+        public List<ChatUser> Chats { get; set; } = new List<ChatUser>(); // Многие ко многим 
 
         public UserProfile()
         {

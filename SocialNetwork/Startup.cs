@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
-using SocialNetwork.Service;
+using SocialNetwork;
+using SocialNetwork.Services;
 
 namespace SocialNetwork
 {
@@ -18,7 +19,7 @@ namespace SocialNetwork
             services.AddControllersWithViews();
 
             services.AddDbContext<UserDbContext>(options =>
-                options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection")));
+                options.UseNpgsql(Configuration.GetConnectionString("Host=localhost;Port=5432;Database=SocialNetwork;Username=postgres;Password=11111111")));
 
             // Регистрация сервисов
             services.AddScoped<UserService>();

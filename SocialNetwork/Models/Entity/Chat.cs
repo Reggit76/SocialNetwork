@@ -7,7 +7,7 @@
         public string Description { get; set; }
 
         public List<Message> Messages { get; set; } = new List<Message>();
-        public List<UserProfile> Participants { get; set; } = new List<UserProfile>();
+        public List<ChatUser> Participants { get; set; } = new List<ChatUser>();
 
         // Добавим конструктор для удобства создания чата
         public Chat()
@@ -22,31 +22,11 @@
             Description = description;
         }
 
-        public Chat(string name, string description, List<UserProfile> participants)
+        public Chat(string name, string description, List<ChatUser> participants)
         {
             Name = name;
             Description = description;
             Participants = participants;
-        }
-
-        // Методы для управления участниками
-        public void AddParticipant(UserProfile user)
-        {
-            if (!Participants.Any(u => u.UserId == user.UserId))
-            {
-                Participants.Add(user);
-            }
-        }
-
-        public void RemoveParticipant(UserProfile user)
-        {
-            Participants.RemoveAll(u => u.UserId == user.UserId);
-        }
-
-        // Метод для добавления сообщения в чат
-        public void AddMessage(Message message)
-        {
-            Messages.Add(message);
         }
     }
 }
