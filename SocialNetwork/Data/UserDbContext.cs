@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
+using SocialNetwork.Services;
 
 namespace SocialNetwork.Data
 {
@@ -14,8 +15,22 @@ namespace SocialNetwork.Data
         public DbSet<Message> Messages { get; set; }
         public DbSet<ChatUser> ChatUsers { get; set; } // Промежуточная таблица
 
+        public UserDbContext()
+        {
+            Database.EnsureCreated();
+        }
+
         public UserDbContext(DbContextOptions<UserDbContext> options) : base(options)
         {
+
+        }
+
+        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        {
+            if (!optionsBuilder.IsConfigured)
+            {
+                optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=SNDB;Username=postgres;Password=11111111");
+            }
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)

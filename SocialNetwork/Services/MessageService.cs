@@ -21,7 +21,8 @@ public class MessageService
             {
                 SenderId = senderId,
                 ChatId = chatId,
-                Content = content
+                Content = content,
+                Timestamp = DateTime.UtcNow
             };
 
             _context.Messages.Add(message);

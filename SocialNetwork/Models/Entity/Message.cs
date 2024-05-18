@@ -10,6 +10,14 @@ namespace SocialNetwork.Models.Entity
         public string Content { get; set; } = null!;
         public DateTime Timestamp { get; set; }
 
+        public Message()
+        {
+            SenderId = -1;
+            ChatId = -1;
+            Content = string.Empty;
+            Timestamp = DateTime.MinValue;
+        }
+
         public Message(int senderId, int chatId, string content)
         {
             SenderId = senderId;
