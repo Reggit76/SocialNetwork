@@ -3,18 +3,18 @@
     public class Comment
     {
         public int Id { get; set; }
-        public int? ParentCommentId { get; set; } // Ссылка на родительский комментарий
-        public int AuthorId { get; set; }
-        public int PostId { get; set; } // Идентификатор поста, к которому относится комментарий
-        public string Content { get; set; }
+        public int PostId { get; set; }
+        public int UserId { get; set; }
+        public string Content { get; set; } = null!;
         public DateTime Timestamp { get; set; }
-        public List<Comment> Replies { get; set; } = new List<Comment>(); // Связанные ответы (вложенные комментарии)
 
-        public void AddReply(Comment reply)
-        {
-            reply.ParentCommentId = this.Id;
-            Replies.Add(reply);
-        }
+        public virtual Post? Post { get; set; }
+        public virtual UserProfile? User { get; set; }
+        public virtual ICollection<Comment> Replies { get; set; } = new List<Comment>();
+
+        public int? ParentCommentId { get; set; }
+        public virtual Comment? ParentComment { get; set; }
+
+        public Comment() { }
     }
-
 }

@@ -3,9 +3,9 @@
     public class ChatUser
     {
         public int ChatId { get; set; }
-        public Chat Chat { get; set; }
+        public virtual Chat? Chat { get; set; }
 
         public int UserId { get; set; }
-        public UserProfile UserProfile { get; set; }
+        public virtual UserProfile? UserProfile { get; set; }
     }
 }

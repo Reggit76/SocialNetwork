@@ -1,17 +1,13 @@
-﻿namespace SocialNetwork.Models.Entity
+﻿namespace SocialNetwork.Models.DTO
 {
-    public class Post
+    public class PostDTO
     {
         public int Id { get; set; }
         public int AuthorId { get; set; }
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
         public int LikesCount { get; set; }
-
-        public virtual UserProfile? Author { get; set; }
-        public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
+        public List<CommentDTO> Comments { get; set; } = new List<CommentDTO>();
         public List<PostTag> Tags { get; set; } = new List<PostTag>();
-
-        public Post() { }
     }
 }

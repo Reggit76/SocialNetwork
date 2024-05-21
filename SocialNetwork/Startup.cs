@@ -1,6 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
-using SocialNetwork;
 using SocialNetwork.Services;
 
 namespace SocialNetwork
@@ -19,7 +19,8 @@ namespace SocialNetwork
             services.AddControllersWithViews();
 
             services.AddDbContext<UserDbContext>(options =>
-                options.UseNpgsql(Configuration.GetConnectionString("Host=localhost;Port=5432;Database=SocialNetwork;Username=postgres;Password=11111111")));
+                options.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"))
+                       .UseLazyLoadingProxies());
 
             // Регистрация сервисов
             services.AddScoped<UserService>();
@@ -28,6 +29,21 @@ namespace SocialNetwork
             services.AddScoped<ChatService>();
             services.AddScoped<MessageService>();
             services.AddScoped<FriendshipService>();
+
+            // Настройка аутентификации с использованием cookies
+            services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+                .AddCookie(options =>
+                {
+                    options.LoginPath = "/Account/Login";
+                    options.LogoutPath = "/Account/Logout";
+                    options.AccessDeniedPath = "/Account/AccessDenied";
+                });
+
+            services.AddAuthorization(options =>
+            {
+                options.AddPolicy("AdminOnly", policy => policy.RequireRole("Administrator"));
+                options.AddPolicy("ModeratorOnly", policy => policy.RequireRole("Moderator"));
+            });
         }
 
         public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -58,5 +74,4 @@ namespace SocialNetwork
             });
         }
     }
-
 }

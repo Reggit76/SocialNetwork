@@ -12,8 +12,8 @@ using SocialNetwork.Data;
 namespace SocialNetwork.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    [Migration("20240518051418_Initial")]
-    partial class Initial
+    [Migration("20240521160805_Init")]
+    partial class Init
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -21,6 +21,9 @@ namespace SocialNetwork.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "7.0.18")
+                .HasAnnotation("Proxies:ChangeTracking", false)
+                .HasAnnotation("Proxies:CheckEquality", false)
+                .HasAnnotation("Proxies:LazyLoading", true)
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -71,12 +74,6 @@ namespace SocialNetwork.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AuthorId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("CommentId")
-                        .HasColumnType("integer");
-
                     b.Property<string>("Content")
                         .IsRequired()
                         .HasColumnType("text");
@@ -90,13 +87,16 @@ namespace SocialNetwork.Migrations
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("AuthorId");
-
-                    b.HasIndex("CommentId");
+                    b.HasIndex("ParentCommentId");
 
                     b.HasIndex("PostId");
+
+                    b.HasIndex("UserId");
 
                     b.ToTable("Comments");
                 });
@@ -111,9 +111,6 @@ namespace SocialNetwork.Migrations
 
                     b.Property<DateTime?>("AcceptanceDate")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("Id")
-                        .HasColumnType("integer");
 
                     b.Property<DateTime>("RequestDate")
                         .HasColumnType("timestamp with time zone");
@@ -224,9 +221,6 @@ namespace SocialNetwork.Migrations
                     b.Property<int>("UserId")
                         .HasColumnType("integer");
 
-                    b.Property<int>("Bio")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("DateOfBirth")
                         .HasColumnType("timestamp with time zone");
 
@@ -235,8 +229,10 @@ namespace SocialNetwork.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
+                    b.Property<int>("Gender")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ProfilePictureUrl")
-                        .IsRequired()
                         .HasMaxLength(255)
                         .HasColumnType("character varying(255)");
 
@@ -269,69 +265,88 @@ namespace SocialNetwork.Migrations
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.Comment", b =>
                 {
-                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", null)
-                        .WithMany()
-                        .HasForeignKey("AuthorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("SocialNetwork.Models.Entity.Comment", null)
+                    b.HasOne("SocialNetwork.Models.Entity.Comment", "ParentComment")
                         .WithMany("Replies")
-                        .HasForeignKey("CommentId");
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("SocialNetwork.Models.Entity.Post", null)
+                    b.HasOne("SocialNetwork.Models.Entity.Post", "Post")
                         .WithMany("Comments")
                         .HasForeignKey("PostId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("Post");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.Friendship", b =>
                 {
-                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", null)
+                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", "Friend")
                         .WithMany()
                         .HasForeignKey("FriendId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", null)
+                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", "User")
                         .WithMany()
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("Friend");
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.Message", b =>
                 {
-                    b.HasOne("SocialNetwork.Models.Entity.Chat", null)
+                    b.HasOne("SocialNetwork.Models.Entity.Chat", "Chat")
                         .WithMany("Messages")
                         .HasForeignKey("ChatId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", null)
+                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", "Sender")
                         .WithMany()
                         .HasForeignKey("SenderId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Chat");
+
+                    b.Navigation("Sender");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.Post", b =>
                 {
-                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", null)
+                    b.HasOne("SocialNetwork.Models.Entity.UserProfile", "Author")
                         .WithMany()
                         .HasForeignKey("AuthorId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("Author");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.UserProfile", b =>
                 {
-                    b.HasOne("SocialNetwork.Models.Entity.User", null)
-                        .WithOne()
+                    b.HasOne("SocialNetwork.Models.Entity.User", "User")
+                        .WithOne("UserProfile")
                         .HasForeignKey("SocialNetwork.Models.Entity.UserProfile", "UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.Navigation("User");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.Chat", b =>
@@ -349,6 +364,11 @@ namespace SocialNetwork.Migrations
             modelBuilder.Entity("SocialNetwork.Models.Entity.Post", b =>
                 {
                     b.Navigation("Comments");
+                });
+
+            modelBuilder.Entity("SocialNetwork.Models.Entity.User", b =>
+                {
+                    b.Navigation("UserProfile");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.UserProfile", b =>

@@ -1,6 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
-using SocialNetwork.Services;
 
 namespace SocialNetwork.Data
 {
@@ -13,24 +12,12 @@ namespace SocialNetwork.Data
         public DbSet<Comment> Comments { get; set; }
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
-        public DbSet<ChatUser> ChatUsers { get; set; } // Промежуточная таблица
-
-        public UserDbContext()
-        {
-            Database.EnsureCreated();
-        }
+        public DbSet<ChatUser> ChatUsers { get; set; }
 
         public UserDbContext(DbContextOptions<UserDbContext> options) : base(options)
         {
-
-        }
-
-        protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        {
-            if (!optionsBuilder.IsConfigured)
-            {
-                optionsBuilder.UseNpgsql("Host=localhost;Port=5432;Database=SNDB;Username=postgres;Password=11111111");
-            }
+            // Включение ленивой загрузки
+            this.ChangeTracker.LazyLoadingEnabled = true;
         }
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -59,6 +46,12 @@ namespace SocialNetwork.Data
                 .IsRequired()
                 .HasMaxLength(100);
 
+            modelBuilder.Entity<User>()
+                .HasOne(u => u.UserProfile)
+                .WithOne(up => up.User)
+                .HasForeignKey<UserProfile>(up => up.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             // UserProfile entity configuration
             modelBuilder.Entity<UserProfile>()
                 .HasKey(up => up.UserId);
@@ -70,11 +63,6 @@ namespace SocialNetwork.Data
             modelBuilder.Entity<UserProfile>()
                 .Property(up => up.ProfilePictureUrl)
                 .HasMaxLength(255);
-
-            modelBuilder.Entity<UserProfile>()
-                .HasOne<User>()
-                .WithOne()
-                .HasForeignKey<UserProfile>(up => up.UserId);
 
             // Post entity configuration
             modelBuilder.Entity<Post>()
@@ -89,7 +77,7 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Post>()
-                .HasOne<UserProfile>()
+                .HasOne(p => p.Author)
                 .WithMany()
                 .HasForeignKey(p => p.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -107,15 +95,21 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Comment>()
-                .HasOne<Post>()
+                .HasOne(c => c.Post)
                 .WithMany(p => p.Comments)
                 .HasForeignKey(c => c.PostId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Comment>()
-                .HasOne<UserProfile>()
+                .HasOne(c => c.User)
                 .WithMany()
-                .HasForeignKey(c => c.AuthorId)
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Comment>()
+                .HasOne(c => c.ParentComment)
+                .WithMany(c => c.Replies)
+                .HasForeignKey(c => c.ParentCommentId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // Chat entity configuration
@@ -143,13 +137,13 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Message>()
-                .HasOne<Chat>()
+                .HasOne(m => m.Chat)
                 .WithMany(c => c.Messages)
                 .HasForeignKey(m => m.ChatId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<Message>()
-                .HasOne<UserProfile>()
+                .HasOne(m => m.Sender)
                 .WithMany()
                 .HasForeignKey(m => m.SenderId)
                 .OnDelete(DeleteBehavior.Cascade);
@@ -159,13 +153,13 @@ namespace SocialNetwork.Data
                 .HasKey(f => new { f.UserId, f.FriendId });
 
             modelBuilder.Entity<Friendship>()
-                .HasOne<UserProfile>()
+                .HasOne(f => f.User)
                 .WithMany()
                 .HasForeignKey(f => f.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 
             modelBuilder.Entity<Friendship>()
-                .HasOne<UserProfile>()
+                .HasOne(f => f.Friend)
                 .WithMany()
                 .HasForeignKey(f => f.FriendId)
                 .OnDelete(DeleteBehavior.Restrict);
@@ -177,12 +171,14 @@ namespace SocialNetwork.Data
             modelBuilder.Entity<ChatUser>()
                 .HasOne(cu => cu.Chat)
                 .WithMany(c => c.Participants)
-                .HasForeignKey(cu => cu.ChatId);
+                .HasForeignKey(cu => cu.ChatId)
+                .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<ChatUser>()
                 .HasOne(cu => cu.UserProfile)
                 .WithMany(up => up.Chats)
-                .HasForeignKey(cu => cu.UserId);
+                .HasForeignKey(cu => cu.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
         }
     }
 }

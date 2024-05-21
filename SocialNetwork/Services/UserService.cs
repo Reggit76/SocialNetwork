@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
 using SocialNetwork.Models;
 
@@ -58,7 +59,7 @@ namespace SocialNetwork.Services
             return true;
         }
 
-        public User AuthenticateUser(string username, string password)
+        public UserDTO AuthenticateUser(string username, string password)
         {
             var user = _context.Users.FirstOrDefault(u => u.Username == username);
             if (user != null)
@@ -66,25 +67,43 @@ namespace SocialNetwork.Services
                 var storedPasswordHash = GetPasswordHash(user.Id);
                 if (VerifyPassword(password, storedPasswordHash))
                 {
-                    return user;
+                    return new UserDTO
+                    {
+                        Id = user.Id,
+                        Username = user.Username,
+                        Email = user.Email
+                    };
                 }
             }
 
             return null;
         }
 
-        public UserProfile GetUserProfile(int userId)
+        public UserProfileDTO GetUserProfile(int userId)
         {
-            return _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
+            var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
+            if (profile != null)
+            {
+                return new UserProfileDTO
+                {
+                    UserId = profile.UserId,
+                    FullName = profile.FullName,
+                    Gender = profile.Gender,
+                    DateOfBirth = profile.DateOfBirth,
+                    ProfilePictureUrl = profile.ProfilePictureUrl,
+                    Role = profile.Role
+                };
+            }
+            return null;
         }
 
-        public bool UpdateUserProfile(UserProfile profile)
+        public bool UpdateUserProfile(UserProfileDTO profile)
         {
             var existingProfile = _context.UserProfiles.FirstOrDefault(p => p.UserId == profile.UserId);
             if (existingProfile != null)
             {
                 existingProfile.FullName = profile.FullName;
-                existingProfile.Bio = profile.Bio;
+                existingProfile.Gender = profile.Gender;
                 existingProfile.DateOfBirth = profile.DateOfBirth;
                 existingProfile.ProfilePictureUrl = profile.ProfilePictureUrl;
                 existingProfile.Role = profile.Role;
@@ -96,13 +115,38 @@ namespace SocialNetwork.Services
             return false;
         }
 
-        public List<Chat> GetUserChats(int userId)
+        public List<ChatDTO> GetUserChats(int userId)
         {
             return _context.ChatUsers
                 .Where(cu => cu.UserId == userId)
                 .Include(cu => cu.Chat)
-                .Select(cu => cu.Chat)
-                .ToList();
+                .ThenInclude(c => c.Messages)
+                .Include(cu => cu.Chat)
+                .ThenInclude(c => c.Participants)
+                .ThenInclude(cp => cp.UserProfile)
+                .Select(cu => new ChatDTO
+                {
+                    Id = cu.Chat.Id,
+                    Name = cu.Chat.Name,
+                    Description = cu.Chat.Description,
+                    Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
+                    {
+                        UserId = p.UserProfile.UserId,
+                        FullName = p.UserProfile.FullName,
+                        Gender = p.UserProfile.Gender,
+                        DateOfBirth = p.UserProfile.DateOfBirth,
+                        ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
+                        Role = p.UserProfile.Role
+                    }).ToList(),
+                    Messages = cu.Chat.Messages.Select(m => new MessageDTO
+                    {
+                        Id = m.Id,
+                        SenderId = m.SenderId,
+                        ChatId = m.ChatId,
+                        Content = m.Content,
+                        Timestamp = m.Timestamp
+                    }).ToList()
+                }).ToList();
         }
 
         private static string HashPassword(string password)

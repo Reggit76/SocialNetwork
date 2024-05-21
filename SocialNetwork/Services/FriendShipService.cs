@@ -1,8 +1,11 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using SocialNetwork.Models;
+using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
+using SocialNetwork.Models;
 
 namespace SocialNetwork.Services
 {
@@ -15,11 +18,12 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public bool AddFriend(int userId, int friendId)
+        public bool SendFriendRequest(int userId, int friendId)
         {
-            if (_context.Friendships.Any(f => f.UserId == userId && f.FriendId == friendId || f.UserId == friendId && f.FriendId == userId))
+            if (_context.Friendships.Any(f => f.UserId == userId && f.FriendId == friendId ||
+                                              f.UserId == friendId && f.FriendId == userId))
             {
-                return false;
+                return false; // Дружба уже существует или запрос уже отправлен
             }
 
             var friendship = new Friendship
@@ -48,29 +52,10 @@ namespace SocialNetwork.Services
             return false;
         }
 
-        public bool DeclineFriendRequest(int userId, int friendId)
-        {
-            var friendship = _context.Friendships.FirstOrDefault(f => f.UserId == friendId && f.FriendId == userId && f.Status == FriendshipStatus.Pending);
-            if (friendship != null)
-            {
-                friendship.Status = FriendshipStatus.Declined;
-                _context.SaveChanges();
-                return true;
-            }
-            return false;
-        }
-
-        public List<int> GetFriends(int userId)
-        {
-            return _context.Friendships
-                .Where(f => (f.UserId == userId || f.FriendId == userId) && f.Status == FriendshipStatus.Accepted)
-                .Select(f => f.UserId == userId ? f.FriendId : f.UserId)
-                .ToList();
-        }
-
         public bool RemoveFriend(int userId, int friendId)
         {
-            var friendship = _context.Friendships.FirstOrDefault(f => f.UserId == userId && f.FriendId == friendId || f.UserId == friendId && f.FriendId == userId);
+            var friendship = _context.Friendships.FirstOrDefault(f => f.UserId == userId && f.FriendId == friendId ||
+                                                                      f.UserId == friendId && f.FriendId == userId);
             if (friendship != null)
             {
                 _context.Friendships.Remove(friendship);
@@ -78,6 +63,36 @@ namespace SocialNetwork.Services
                 return true;
             }
             return false;
+        }
+
+        public List<FriendshipDTO> GetFriends(int userId)
+        {
+            return _context.Friendships
+                .Where(f => f.UserId == userId && f.Status == FriendshipStatus.Accepted)
+                .Select(f => new FriendshipDTO
+                {
+                    UserId = f.UserId,
+                    FriendId = f.FriendId,
+                    Status = f.Status,
+                    RequestDate = f.RequestDate,
+                    AcceptanceDate = f.AcceptanceDate
+                })
+                .ToList();
+        }
+
+        public List<FriendshipDTO> GetPendingRequests(int userId)
+        {
+            return _context.Friendships
+                .Where(f => f.FriendId == userId && f.Status == FriendshipStatus.Pending)
+                .Select(f => new FriendshipDTO
+                {
+                    UserId = f.UserId,
+                    FriendId = f.FriendId,
+                    Status = f.Status,
+                    RequestDate = f.RequestDate,
+                    AcceptanceDate = f.AcceptanceDate
+                })
+                .ToList();
         }
     }
 }
