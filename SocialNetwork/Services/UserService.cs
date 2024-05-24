@@ -5,200 +5,249 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
 using SocialNetwork.Models;
 
-namespace SocialNetwork.Services
+public class UserService
 {
-    public class UserService
+    private readonly UserDbContext _context;
+
+    public UserService(UserDbContext context)
     {
-        private readonly UserDbContext _context;
+        _context = context;
+    }
 
-        public UserService(UserDbContext context)
+    public bool RegisterUser(string username, string email, string password)
+    {
+        if (_context.Users.Any(u => u.Username == username || u.Email == email))
         {
-            _context = context;
-        }
-
-        public bool RegisterUser(string username, string email, string password)
-        {
-            if (_context.Users.Any(u => u.Username == username || u.Email == email))
-            {
-                return false;
-            }
-
-            if (!IsValidPassword(password))
-            {
-                throw new ArgumentException("Password does not meet the required criteria.");
-            }
-
-            var user = new User
-            {
-                Username = username,
-                Email = email,
-            };
-
-            _context.Users.Add(user);
-            _context.SaveChanges();
-
-            // Создание профиля пользователя
-            var userProfile = new UserProfile
-            {
-                UserId = user.Id,
-                Role = UserRole.RegularUser // Значение по умолчанию
-            };
-            _context.UserProfiles.Add(userProfile);
-            _context.SaveChanges();
-
-            // Сохранить хэш пароля отдельно в таблице паролей
-            var passwordHash = HashPassword(password);
-            SavePasswordHash(user.Id, passwordHash);
-
-            return true;
-        }
-
-        public UserDTO AuthenticateUser(string username, string password)
-        {
-            var user = _context.Users.FirstOrDefault(u => u.Username == username);
-            if (user != null)
-            {
-                var storedPasswordHash = GetPasswordHash(user.Id);
-                if (VerifyPassword(password, storedPasswordHash))
-                {
-                    return new UserDTO
-                    {
-                        Id = user.Id,
-                        Username = user.Username,
-                        Email = user.Email
-                    };
-                }
-            }
-
-            return null;
-        }
-
-        public UserProfileDTO GetUserProfile(int userId)
-        {
-            var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
-            if (profile != null)
-            {
-                return new UserProfileDTO
-                {
-                    UserId = profile.UserId,
-                    FullName = profile.FullName,
-                    Gender = profile.Gender,
-                    DateOfBirth = profile.DateOfBirth,
-                    ProfilePictureUrl = profile.ProfilePictureUrl,
-                    Role = profile.Role
-                };
-            }
-            return null;
-        }
-
-        public bool UpdateUserProfile(UserProfileDTO profile)
-        {
-            var existingProfile = _context.UserProfiles.FirstOrDefault(p => p.UserId == profile.UserId);
-            if (existingProfile != null)
-            {
-                existingProfile.FullName = profile.FullName;
-                existingProfile.Gender = profile.Gender;
-                existingProfile.DateOfBirth = profile.DateOfBirth;
-                existingProfile.ProfilePictureUrl = profile.ProfilePictureUrl;
-                existingProfile.Role = profile.Role;
-
-                _context.SaveChanges();
-                return true;
-            }
-
             return false;
         }
 
-        public List<ChatDTO> GetUserChats(int userId)
+        if (!IsValidPassword(password))
         {
-            return _context.ChatUsers
-                .Where(cu => cu.UserId == userId)
-                .Include(cu => cu.Chat)
-                .ThenInclude(c => c.Messages)
-                .Include(cu => cu.Chat)
-                .ThenInclude(c => c.Participants)
-                .ThenInclude(cp => cp.UserProfile)
-                .Select(cu => new ChatDTO
-                {
-                    Id = cu.Chat.Id,
-                    Name = cu.Chat.Name,
-                    Description = cu.Chat.Description,
-                    Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
-                    {
-                        UserId = p.UserProfile.UserId,
-                        FullName = p.UserProfile.FullName,
-                        Gender = p.UserProfile.Gender,
-                        DateOfBirth = p.UserProfile.DateOfBirth,
-                        ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
-                        Role = p.UserProfile.Role
-                    }).ToList(),
-                    Messages = cu.Chat.Messages.Select(m => new MessageDTO
-                    {
-                        Id = m.Id,
-                        SenderId = m.SenderId,
-                        ChatId = m.ChatId,
-                        Content = m.Content,
-                        Timestamp = m.Timestamp
-                    }).ToList()
-                }).ToList();
+            throw new ArgumentException("Password does not meet the required criteria.");
         }
 
-        private static string HashPassword(string password)
+        var user = new User
         {
-            var hashedBytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-            return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
+            Username = username,
+            Email = email,
+        };
+
+        _context.Users.Add(user);
+        _context.SaveChanges();
+
+        // Создание профиля пользователя с начальным значением FullName
+        var userProfile = new UserProfile
+        {
+            UserId = user.Id,
+            FullName = "", // Инициализация пустым значением, чтобы удовлетворить ограничение NOT NULL
+            Role = UserRole.RegularUser
+        };
+        _context.UserProfiles.Add(userProfile);
+        _context.SaveChanges();
+
+        // Сохранить хэш пароля отдельно в таблице Users
+        var passwordHash = HashPassword(password);
+        SavePasswordHash(user.Id, passwordHash);
+
+        return true;
+    }
+
+    public bool RegisterUserAsAdmin(string username, string email, string password, UserRole role)
+    {
+        if (_context.Users.Any(u => u.Username == username || u.Email == email))
+        {
+            return false;
         }
 
-        private static bool VerifyPassword(string password, string passwordHash)
+        if (!IsValidPassword(password))
         {
-            var hashedPassword = HashPassword(password);
-            return hashedPassword == passwordHash;
+            throw new ArgumentException("Password does not meet the required criteria.");
         }
 
-        private static bool IsValidPassword(string password)
+        var user = new User
         {
-            var passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$";
-            return Regex.IsMatch(password, passwordPattern);
-        }
+            Username = username,
+            Email = email,
+        };
 
-        private void SavePasswordHash(int userId, string passwordHash)
+        _context.Users.Add(user);
+        _context.SaveChanges();
+
+        // Создание профиля пользователя с указанной ролью и начальным значением FullName
+        var userProfile = new UserProfile
         {
-            using (var connection = new NpgsqlConnection(_context.Database.GetDbConnection().ConnectionString))
+            UserId = user.Id,
+            FullName = "", // Инициализация пустым значением, чтобы удовлетворить ограничение NOT NULL
+            Role = role
+        };
+        _context.UserProfiles.Add(userProfile);
+        _context.SaveChanges();
+
+        // Сохранить хэш пароля отдельно в таблице Users
+        var passwordHash = HashPassword(password);
+        SavePasswordHash(user.Id, passwordHash);
+
+        return true;
+    }
+
+    public UserDTO AuthenticateUser(string username, string password)
+    {
+        var user = _context.Users.FirstOrDefault(u => u.Username == username);
+        if (user != null)
+        {
+            var storedPasswordHash = GetPasswordHash(user.Id);
+            if (VerifyPassword(password, storedPasswordHash))
             {
-                connection.Open();
-                using (var command = new NpgsqlCommand("INSERT INTO UserPasswords (UserId, PasswordHash) VALUES (@userId, @passwordHash)", connection))
+                return new UserDTO
                 {
-                    command.Parameters.AddWithValue("userId", userId);
-                    command.Parameters.AddWithValue("passwordHash", passwordHash);
-                    command.ExecuteNonQuery();
-                }
+                    Id = user.Id,
+                    Username = user.Username,
+                    Email = user.Email
+                };
             }
         }
 
-        private string GetPasswordHash(int userId)
+        return null;
+    }
+
+    public UserProfileDTO GetUserProfile(int userId)
+    {
+        var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
+        if (profile != null)
         {
-            using (var connection = new NpgsqlConnection(_context.Database.GetDbConnection().ConnectionString))
+            return new UserProfileDTO
             {
-                connection.Open();
-                using (var command = new NpgsqlCommand("SELECT PasswordHash FROM UserPasswords WHERE UserId = @userId", connection))
-                {
-                    command.Parameters.AddWithValue("userId", userId);
-                    using (var reader = command.ExecuteReader())
-                    {
-                        if (reader.Read())
-                        {
-                            return reader.GetString(0);
-                        }
-                    }
-                }
-            }
-            return null;
+                UserId = profile.UserId,
+                FullName = profile.FullName,
+                Gender = profile.Gender,
+                DateOfBirth = profile.DateOfBirth,
+                ProfilePictureUrl = profile.ProfilePictureUrl,
+                Role = profile.Role
+            };
         }
+        return null;
+    }
+
+    public bool UpdateUserProfile(UserProfileDTO profile)
+    {
+        var existingProfile = _context.UserProfiles.FirstOrDefault(p => p.UserId == profile.UserId);
+        if (existingProfile != null)
+        {
+            existingProfile.FullName = profile.FullName;
+            existingProfile.Gender = profile.Gender;
+            existingProfile.DateOfBirth = profile.DateOfBirth;
+            existingProfile.ProfilePictureUrl = profile.ProfilePictureUrl;
+            existingProfile.Role = profile.Role;
+
+            _context.SaveChanges();
+            return true;
+        }
+
+        return false;
+    }
+
+    public List<ChatDTO> GetUserChats(int userId)
+    {
+        return _context.ChatUsers
+            .Where(cu => cu.UserId == userId)
+            .Include(cu => cu.Chat)
+            .ThenInclude(c => c.Messages)
+            .Include(cu => cu.Chat)
+            .ThenInclude(c => c.Participants)
+            .ThenInclude(cp => cp.UserProfile)
+            .Select(cu => new ChatDTO
+            {
+                Id = cu.Chat.Id,
+                Name = cu.Chat.Name,
+                Description = cu.Chat.Description,
+                Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
+                {
+                    UserId = p.UserProfile.UserId,
+                    FullName = p.UserProfile.FullName,
+                    Gender = p.UserProfile.Gender,
+                    DateOfBirth = p.UserProfile.DateOfBirth,
+                    ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
+                    Role = p.UserProfile.Role
+                }).ToList(),
+                Messages = cu.Chat.Messages.Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    ChatId = m.ChatId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList()
+            }).ToList();
+    }
+
+    public UserRole GetUserRole(int userId)
+    {
+        var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
+        return profile?.Role ?? UserRole.RegularUser;
+    }
+
+    public void UpdateUserRole(int userId, UserRole newRole)
+    {
+        var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
+        if (profile != null)
+        {
+            profile.Role = newRole;
+            _context.SaveChanges();
+        }
+    }
+
+    public List<UserDTO> GetAllUsers()
+    {
+        return _context.Users
+            .Include(u => u.UserProfile)
+            .Select(u => new UserDTO
+            {
+                Id = u.Id,
+                Username = u.Username,
+                Email = u.Email
+            }).ToList();
+    }
+
+    private static string HashPassword(string password)
+    {
+        var hashedBytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
+        return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
+    }
+
+    private static bool VerifyPassword(string password, string passwordHash)
+    {
+        var hashedPassword = HashPassword(password);
+        return hashedPassword == passwordHash;
+    }
+
+    private static bool IsValidPassword(string password)
+    {
+        var passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$";
+        return Regex.IsMatch(password, passwordPattern);
+    }
+
+    private void SavePasswordHash(int userId, string passwordHash)
+    {
+        var user = _context.Users.Find(userId);
+        if (user != null)
+        {
+            _context.Entry(user).Property("PasswordHash").CurrentValue = passwordHash;
+            _context.SaveChanges();
+        }
+    }
+
+    private string GetPasswordHash(int userId)
+    {
+        var user = _context.Users.Find(userId);
+        if (user != null)
+        {
+            return _context.Entry(user).Property("PasswordHash").CurrentValue as string;
+        }
+        return null;
     }
 }

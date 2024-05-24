@@ -12,7 +12,7 @@ using SocialNetwork.Data;
 namespace SocialNetwork.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    [Migration("20240521160805_Init")]
+    [Migration("20240523133534_Init")]
     partial class Init
     {
         /// <inheritdoc />
@@ -199,6 +199,9 @@ namespace SocialNetwork.Migrations
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .HasColumnType("text");
 
                     b.Property<string>("Username")
                         .IsRequired()

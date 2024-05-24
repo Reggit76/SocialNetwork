@@ -47,6 +47,9 @@ namespace SocialNetwork.Data
                 .HasMaxLength(100);
 
             modelBuilder.Entity<User>()
+                .Property<string>("PasswordHash");
+
+            modelBuilder.Entity<User>()
                 .HasOne(u => u.UserProfile)
                 .WithOne(up => up.User)
                 .HasForeignKey<UserProfile>(up => up.UserId)
