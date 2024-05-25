@@ -85,6 +85,15 @@ namespace SocialNetwork.Data
                 .HasForeignKey(p => p.AuthorId)
                 .OnDelete(DeleteBehavior.Cascade);
 
+            // PostTag entity configyration
+            modelBuilder.Entity<PostTag>()
+                .HasKey(pt => new { pt.PostId, pt.Tag });
+
+            modelBuilder.Entity<PostTag>()
+                .HasOne(pt => pt.Post)
+                .WithMany(p => p.Tags)
+                .HasForeignKey(pt => pt.PostId);
+
             // Comment entity configuration
             modelBuilder.Entity<Comment>()
                 .HasKey(c => c.Id);

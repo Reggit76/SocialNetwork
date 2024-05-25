@@ -10,7 +10,7 @@
 
         public virtual UserProfile? Author { get; set; }
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
-        public List<PostTag> Tags { get; set; } = new List<PostTag>();
+        public virtual ICollection<PostTag> Tags { get; set; } = new List<PostTag>();
 
         public Post() { }
     }

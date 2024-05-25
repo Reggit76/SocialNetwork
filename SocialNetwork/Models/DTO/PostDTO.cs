@@ -1,4 +1,7 @@
-﻿namespace SocialNetwork.Models.DTO
+﻿using System;
+using System.Collections.Generic;
+
+namespace SocialNetwork.Models.DTO
 {
     public class PostDTO
     {
@@ -7,7 +10,7 @@
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
         public int LikesCount { get; set; }
+        public List<string> Tags { get; set; } = new List<string>();
         public List<CommentDTO> Comments { get; set; } = new List<CommentDTO>();
-        public List<PostTag> Tags { get; set; } = new List<PostTag>();
     }
 }

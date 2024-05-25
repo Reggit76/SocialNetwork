@@ -7,7 +7,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace SocialNetwork.Migrations
 {
     /// <inheritdoc />
-    public partial class Init : Migration
+    public partial class Reload : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -48,7 +48,7 @@ namespace SocialNetwork.Migrations
                     UserId = table.Column<int>(type: "integer", nullable: false),
                     FullName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     Gender = table.Column<int>(type: "integer", nullable: false),
-                    DateOfBirth = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    DateOfBirth = table.Column<DateTime>(type: "timestamp without time zone", nullable: false),
                     ProfilePictureUrl = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
                     Role = table.Column<int>(type: "integer", nullable: false)
                 },
@@ -151,8 +151,7 @@ namespace SocialNetwork.Migrations
                     AuthorId = table.Column<int>(type: "integer", nullable: false),
                     Content = table.Column<string>(type: "text", nullable: false),
                     DatePosted = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    LikesCount = table.Column<int>(type: "integer", nullable: false),
-                    Tags = table.Column<int[]>(type: "integer[]", nullable: false)
+                    LikesCount = table.Column<int>(type: "integer", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -197,6 +196,24 @@ namespace SocialNetwork.Migrations
                         column: x => x.UserId,
                         principalTable: "UserProfiles",
                         principalColumn: "UserId",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "PostTag",
+                columns: table => new
+                {
+                    PostId = table.Column<int>(type: "integer", nullable: false),
+                    Tag = table.Column<string>(type: "text", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_PostTag", x => new { x.PostId, x.Tag });
+                    table.ForeignKey(
+                        name: "FK_PostTag_Posts_PostId",
+                        column: x => x.PostId,
+                        principalTable: "Posts",
+                        principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
 
@@ -269,10 +286,13 @@ namespace SocialNetwork.Migrations
                 name: "Messages");
 
             migrationBuilder.DropTable(
-                name: "Posts");
+                name: "PostTag");
 
             migrationBuilder.DropTable(
                 name: "Chats");
+
+            migrationBuilder.DropTable(
+                name: "Posts");
 
             migrationBuilder.DropTable(
                 name: "UserProfiles");

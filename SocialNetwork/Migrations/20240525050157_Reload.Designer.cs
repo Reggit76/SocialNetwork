@@ -12,8 +12,8 @@ using SocialNetwork.Data;
 namespace SocialNetwork.Migrations
 {
     [DbContext(typeof(UserDbContext))]
-    [Migration("20240523133534_Init")]
-    partial class Init
+    [Migration("20240525050157_Reload")]
+    partial class Reload
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -176,15 +176,24 @@ namespace SocialNetwork.Migrations
                     b.Property<int>("LikesCount")
                         .HasColumnType("integer");
 
-                    b.Property<int[]>("Tags")
-                        .IsRequired()
-                        .HasColumnType("integer[]");
-
                     b.HasKey("Id");
 
                     b.HasIndex("AuthorId");
 
                     b.ToTable("Posts");
+                });
+
+            modelBuilder.Entity("SocialNetwork.Models.Entity.PostTag", b =>
+                {
+                    b.Property<int>("PostId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Tag")
+                        .HasColumnType("text");
+
+                    b.HasKey("PostId", "Tag");
+
+                    b.ToTable("PostTag");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.User", b =>
@@ -341,6 +350,17 @@ namespace SocialNetwork.Migrations
                     b.Navigation("Author");
                 });
 
+            modelBuilder.Entity("SocialNetwork.Models.Entity.PostTag", b =>
+                {
+                    b.HasOne("SocialNetwork.Models.Entity.Post", "Post")
+                        .WithMany("Tags")
+                        .HasForeignKey("PostId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Post");
+                });
+
             modelBuilder.Entity("SocialNetwork.Models.Entity.UserProfile", b =>
                 {
                     b.HasOne("SocialNetwork.Models.Entity.User", "User")
@@ -367,6 +387,8 @@ namespace SocialNetwork.Migrations
             modelBuilder.Entity("SocialNetwork.Models.Entity.Post", b =>
                 {
                     b.Navigation("Comments");
+
+                    b.Navigation("Tags");
                 });
 
             modelBuilder.Entity("SocialNetwork.Models.Entity.User", b =>

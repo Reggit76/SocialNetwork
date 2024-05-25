@@ -1,77 +1,65 @@
-﻿using System.Collections.Generic;
-using System.Linq;
-using Microsoft.EntityFrameworkCore;
-using SocialNetwork.Models.Entity;
+﻿using SocialNetwork.Data;
 using SocialNetwork.Models.DTO;
-using SocialNetwork.Data;
+using SocialNetwork.Models.Entity;
+using System;
+using System.Linq;
 
-namespace SocialNetwork.Services
+public class CommentService
 {
-    public class CommentService
+    private readonly UserDbContext _context;
+
+    public CommentService(UserDbContext context)
     {
-        private readonly UserDbContext _context;
+        _context = context;
+    }
 
-        public CommentService(UserDbContext context)
+    public CommentDTO GetCommentById(int commentId)
+    {
+        var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment == null)
         {
-            _context = context;
+            return null;
         }
-
-        public CommentDTO AddComment(int postId, int userId, string content, int? parentCommentId = null)
+        return new CommentDTO
         {
-            var comment = new Comment
-            {
-                PostId = postId,
-                UserId = userId,
-                Content = content,
-                Timestamp = DateTime.UtcNow,
-                ParentCommentId = parentCommentId
-            };
+            Id = comment.Id,
+            PostId = comment.PostId,
+            UserId = comment.UserId,
+            Content = comment.Content,
+            Timestamp = comment.Timestamp
+        };
+    }
 
-            _context.Comments.Add(comment);
+    public void AddComment(CommentDTO commentDTO)
+    {
+        var comment = new Comment
+        {
+            PostId = commentDTO.PostId,
+            UserId = commentDTO.UserId,
+            Content = commentDTO.Content,
+            Timestamp = DateTime.UtcNow // Преобразование в UTC
+        };
+        _context.Comments.Add(comment);
+        _context.SaveChanges();
+    }
+
+    public void UpdateComment(CommentDTO commentDTO)
+    {
+        var comment = _context.Comments.FirstOrDefault(c => c.Id == commentDTO.Id);
+        if (comment != null)
+        {
+            comment.Content = commentDTO.Content;
             _context.SaveChanges();
-
-            return new CommentDTO
-            {
-                Id = comment.Id,
-                PostId = comment.PostId,
-                UserId = comment.UserId,
-                Content = comment.Content,
-                Timestamp = comment.Timestamp
-            };
         }
+    }
 
-        public bool DeleteComment(int commentId)
+    public void DeleteComment(int commentId)
+    {
+        var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+        if (comment != null)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
-            if (comment != null)
-            {
-                _context.Comments.Remove(comment);
-                _context.SaveChanges();
-                return true;
-            }
-            return false;
-        }
-
-        public List<CommentDTO> GetCommentsForPost(int postId)
-        {
-            return _context.Comments
-                .Where(c => c.PostId == postId)
-                .Select(c => new CommentDTO
-                {
-                    Id = c.Id,
-                    PostId = c.PostId,
-                    UserId = c.UserId,
-                    Content = c.Content,
-                    Timestamp = c.Timestamp,
-                    Replies = c.Replies.Select(r => new CommentDTO
-                    {
-                        Id = r.Id,
-                        PostId = r.PostId,
-                        UserId = r.UserId,
-                        Content = r.Content,
-                        Timestamp = r.Timestamp
-                    }).ToList()
-                }).ToList();
+            _context.Comments.Remove(comment);
+            _context.SaveChanges();
         }
     }
 }
