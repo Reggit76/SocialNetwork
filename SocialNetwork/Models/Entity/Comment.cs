@@ -6,7 +6,7 @@
         public int PostId { get; set; }
         public int UserId { get; set; }
         public string Content { get; set; } = null!;
-        public DateTime Timestamp { get; set; }
+        public DateTime DatePosted { get; set; }
 
         public virtual Post? Post { get; set; }
         public virtual UserProfile? User { get; set; }

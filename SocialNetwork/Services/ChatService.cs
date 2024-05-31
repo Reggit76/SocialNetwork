@@ -4,51 +4,101 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
+using SocialNetwork.Services.Interfaces;
 
 namespace SocialNetwork.Services
 {
-    public class ChatService
+    public class ChatService : IChatService
     {
         private readonly UserDbContext _context;
-        private readonly MessageService _messageService;
+        private readonly IMessageService _messageService;
 
-        public ChatService(UserDbContext context, MessageService messageService)
+        public ChatService(UserDbContext context, IMessageService messageService)
         {
             _context = context;
             _messageService = messageService;
         }
 
-        public ChatDTO CreateChat(string name, string description, List<int> participantIds)
+        public void CreateChat(string name, string description, List<int> participantIds)
         {
             var chat = new Chat
             {
                 Name = name,
                 Description = description,
+                Participants = participantIds.Select(id => new ChatUser { UserId = id }).ToList()
             };
 
             _context.Chats.Add(chat);
             _context.SaveChanges();
+        }
 
-            // Добавление участников в чат
-            foreach (var userId in participantIds)
-            {
-                var chatUser = new ChatUser
+        public List<ChatDTO> GetUserChats(int userId)
+        {
+            return _context.ChatUsers
+                .Where(cu => cu.UserId == userId)
+                .Include(cu => cu.Chat)
+                .ThenInclude(c => c.Messages)
+                .Include(cu => cu.Chat)
+                .ThenInclude(c => c.Participants)
+                .ThenInclude(cp => cp.UserProfile)
+                .Select(cu => new ChatDTO
                 {
-                    ChatId = chat.Id,
-                    UserId = userId
-                };
-                _context.ChatUsers.Add(chatUser);
-            }
+                    Id = cu.Chat.Id,
+                    Name = cu.Chat.Name,
+                    Description = cu.Chat.Description,
+                    Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
+                    {
+                        UserId = p.UserProfile.UserId,
+                        FullName = p.UserProfile.FullName,
+                        Gender = p.UserProfile.Gender,
+                        DateOfBirth = p.UserProfile.DateOfBirth,
+                        ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
+                        Role = p.UserProfile.Role
+                    }).ToList(),
+                    Messages = cu.Chat.Messages.Select(m => new MessageDTO
+                    {
+                        Id = m.Id,
+                        SenderId = m.SenderId,
+                        ChatId = m.ChatId,
+                        Content = m.Content,
+                        Timestamp = m.Timestamp
+                    }).ToList()
+                }).ToList();
+        }
 
-            _context.SaveChanges();
+        public ChatDTO GetChat(int chatId)
+        {
+            var chat = _context.Chats
+                .Include(c => c.Messages)
+                .Include(c => c.Participants)
+                .ThenInclude(cp => cp.UserProfile)
+                .FirstOrDefault(c => c.Id == chatId);
+
+            if (chat == null)
+                return null;
 
             return new ChatDTO
             {
                 Id = chat.Id,
                 Name = chat.Name,
                 Description = chat.Description,
-                Participants = participantIds.Select(id => new UserProfileDTO { UserId = id }).ToList(),
-                Messages = new List<MessageDTO>()
+                Participants = chat.Participants.Select(p => new UserProfileDTO
+                {
+                    UserId = p.UserProfile.UserId,
+                    FullName = p.UserProfile.FullName,
+                    Gender = p.UserProfile.Gender,
+                    DateOfBirth = p.UserProfile.DateOfBirth,
+                    ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
+                    Role = p.UserProfile.Role
+                }).ToList(),
+                Messages = chat.Messages.Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    ChatId = m.ChatId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList()
             };
         }
 

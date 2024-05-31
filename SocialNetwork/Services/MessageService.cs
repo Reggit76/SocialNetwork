@@ -1,12 +1,14 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
-using SocialNetwork.Models.Entity;
-using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Services.Interfaces;
 
 namespace SocialNetwork.Services
 {
-    public class MessageService
+    public class MessageService : IMessageService
     {
         private readonly UserDbContext _context;
 
@@ -15,33 +17,29 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public void SendMessage(int senderId, int chatId, string content)
+        public void SendMessage(int chatId, int senderId, string content)
         {
-            var chat = _context.Chats.FirstOrDefault(c => c.Id == chatId);
-            if (chat != null)
+            var message = new Message
             {
-                var message = new Message
-                {
-                    SenderId = senderId,
-                    ChatId = chatId,
-                    Content = content,
-                    Timestamp = DateTime.UtcNow
-                };
+                ChatId = chatId,
+                SenderId = senderId,
+                Content = content,
+                Timestamp = DateTime.UtcNow
+            };
 
-                _context.Messages.Add(message);
-                _context.SaveChanges();
-            }
+            _context.Messages.Add(message);
+            _context.SaveChanges();
         }
 
-        public List<MessageDTO> GetMessagesForUser(int userId)
+        public List<MessageDTO> GetMessages(int chatId)
         {
             return _context.Messages
-                .Where(m => m.SenderId == userId)
+                .Where(m => m.ChatId == chatId)
                 .Select(m => new MessageDTO
                 {
                     Id = m.Id,
-                    SenderId = m.SenderId,
                     ChatId = m.ChatId,
+                    SenderId = m.SenderId,
                     Content = m.Content,
                     Timestamp = m.Timestamp
                 }).ToList();

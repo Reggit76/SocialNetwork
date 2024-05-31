@@ -1,0 +1,28 @@
+﻿@using System.Security.Claims
+@model SocialNetwork.Models.DTO.ChatDTO
+
+@{
+    ViewData["Title"] = "Chat Details";
+}
+
+<h2>@Model.Name</h2>
+<p>@Model.Description</p>
+
+<div>
+    <input type="hidden" id="chatId" value="@Model.Id" />
+    <input type="hidden" id="senderId" value="@User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)" />
+    <input type="text" id="messageInput" placeholder="Enter message" />
+    <button id="sendButton">Send</button>
+</div>
+
+<div id="messagesList">
+    @foreach (var message in Model.Messages)
+    {
+        <div>User @message.SenderId: @message.Content</div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/chat.js"></script>
+}

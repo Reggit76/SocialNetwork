@@ -6,7 +6,7 @@ namespace SocialNetwork.Models.DTO
     public class PostDTO
     {
         public int Id { get; set; }
-        public int AuthorId { get; set; }
+        public int UserId { get; set; }
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
         public int LikesCount { get; set; }

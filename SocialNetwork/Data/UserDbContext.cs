@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
+using System.Configuration;
 
 namespace SocialNetwork.Data
 {
@@ -19,6 +20,13 @@ namespace SocialNetwork.Data
             // Включение ленивой загрузки
             this.ChangeTracker.LazyLoadingEnabled = true;
         }
+
+        //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
+        //{
+        //    optionsBuilder.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"))
+        //                  .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
+        //                  .ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning));
+        //}
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -67,6 +75,10 @@ namespace SocialNetwork.Data
                 .Property(up => up.ProfilePictureUrl)
                 .HasMaxLength(255);
 
+            modelBuilder.Entity<UserProfile>()
+                .Property(up => up.DateOfBirth)
+                .HasColumnType("date");
+
             // Post entity configuration
             modelBuilder.Entity<Post>()
                 .HasKey(p => p.Id);
@@ -80,9 +92,9 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Post>()
-                .HasOne(p => p.Author)
+                .HasOne(p => p.User)
                 .WithMany()
-                .HasForeignKey(p => p.AuthorId)
+                .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
             // PostTag entity configyration
@@ -103,7 +115,7 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Comment>()
-                .Property(c => c.Timestamp)
+                .Property(c => c.DatePosted)
                 .IsRequired();
 
             modelBuilder.Entity<Comment>()

@@ -15,6 +15,7 @@ namespace SocialNetwork.Controllers
             _postService = postService;
         }
 
+        [HttpGet]
         public IActionResult Index()
         {
             var posts = _postService.GetAllPosts();
@@ -32,8 +33,15 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                _postService.CreatePost(postDTO);
-                return RedirectToAction("Index");
+                try
+                {
+                    _postService.CreatePost(postDTO);
+                    return RedirectToAction("Index");
+                }
+                catch (ArgumentException ex)
+                {
+                    ModelState.AddModelError(string.Empty, ex.Message);
+                }
             }
             return View(postDTO);
         }

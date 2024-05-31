@@ -14,7 +14,7 @@
             Author
         </dt>
         <dd class="col-sm-10">
-            @Model.AuthorId
+            @Model.UserId
         </dd>
         <dt class="col-sm-2">
             Content
@@ -47,7 +47,7 @@
     {
         <div class="comment">
             <p><strong>@comment.UserId:</strong> @comment.Content</p>
-            <p><small>@comment.Timestamp</small></p>
+            <p><small>@comment.DatePosted</small></p>
             <form asp-action="DeleteComment" method="post">
                 <input type="hidden" name="commentId" value="@comment.Id" />
                 <input type="hidden" name="postId" value="@Model.Id" />

@@ -6,10 +6,11 @@ using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
 using SocialNetwork.Models;
+using SocialNetwork.Services.Interfaces;
 
 namespace SocialNetwork.Services
 {
-    public class FriendshipService
+    public class FriendshipService : IFriendshipService
     {
         private readonly UserDbContext _context;
 
@@ -65,19 +66,49 @@ namespace SocialNetwork.Services
             return false;
         }
 
-        public List<FriendshipDTO> GetFriends(int userId)
+        public List<UserProfileDTO> GetFriends(int userId)
         {
             return _context.Friendships
                 .Where(f => f.UserId == userId && f.Status == FriendshipStatus.Accepted)
-                .Select(f => new FriendshipDTO
+                .Include(f => f.Friend)
+                .Select(f => new UserProfileDTO
                 {
-                    UserId = f.UserId,
-                    FriendId = f.FriendId,
-                    Status = f.Status,
-                    RequestDate = f.RequestDate,
-                    AcceptanceDate = f.AcceptanceDate
+                    UserId = f.Friend.UserId,
+                    FullName = f.Friend.FullName,
+                    Gender = f.Friend.Gender,
+                    DateOfBirth = f.Friend.DateOfBirth,
+                    ProfilePictureUrl = f.Friend.ProfilePictureUrl,
+                    Role = f.Friend.Role
                 })
                 .ToList();
+        }
+
+        public List<UserProfileDTO> GetIncomingFriendRequests(int userId)
+        {
+            return _context.Friendships
+                .Where(f => f.FriendId == userId && f.Status == FriendshipStatus.Pending)
+                .Include(f => f.User)
+                .Select(f => new UserProfileDTO
+                {
+                    UserId = f.User.UserId,
+                    FullName = f.User.FullName,
+                    Gender = f.User.Gender,
+                    DateOfBirth = f.User.DateOfBirth,
+                    ProfilePictureUrl = f.User.ProfilePictureUrl,
+                    Role = f.User.Role
+                })
+                .ToList();
+        }
+
+        public bool IsFriend(int userId, int friendId)
+        {
+            return _context.Friendships.Any(f => f.UserId == userId && f.FriendId == friendId && f.Status == FriendshipStatus.Accepted ||
+                                                 f.UserId == friendId && f.FriendId == userId && f.Status == FriendshipStatus.Accepted);
+        }
+
+        public bool HasPendingRequest(int userId, int friendId)
+        {
+            return _context.Friendships.Any(f => f.UserId == friendId && f.FriendId == userId && f.Status == FriendshipStatus.Pending);
         }
 
         public List<FriendshipDTO> GetPendingRequests(int userId)

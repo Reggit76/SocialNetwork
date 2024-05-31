@@ -7,6 +7,7 @@ using SocialNetwork.Models.AccountViewModels;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Services;
+using SocialNetwork.Services.Interfaces;
 using System.Collections.Generic;
 using System.Security.Claims;
 using System.Threading.Tasks;
@@ -15,9 +16,9 @@ namespace SocialNetwork.Controllers
 {
     public class AccountController : Controller
     {
-        private readonly UserService _userService;
+        private readonly IUserService _userService;
 
-        public AccountController(UserService userService)
+        public AccountController(IUserService userService)
         {
             _userService = userService;
         }
@@ -57,13 +58,13 @@ namespace SocialNetwork.Controllers
                 new Claim(ClaimTypes.Role, role.ToString())
             };
 
-            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+            var claimsIdentity = new ClaimsIdentity(claims, "MyCookieAuthenticationScheme");
             var authProperties = new AuthenticationProperties
             {
                 IsPersistent = true
             };
 
-            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme,
+            await HttpContext.SignInAsync("MyCookieAuthenticationScheme",
                 new ClaimsPrincipal(claimsIdentity), authProperties);
         }
 
@@ -93,7 +94,7 @@ namespace SocialNetwork.Controllers
         [Authorize]
         public async Task<IActionResult> Logout()
         {
-            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            await HttpContext.SignOutAsync("MyCookieAuthenticationScheme");
             return RedirectToAction("Login");
         }
 
@@ -152,7 +153,7 @@ namespace SocialNetwork.Controllers
                     UserId = model.UserId,
                     FullName = model.FullName,
                     Gender = model.Gender,
-                    DateOfBirth = model.DateOfBirth,
+                    DateOfBirth = model.DateOfBirth, 
                     ProfilePictureUrl = model.ProfilePictureUrl
                 };
                 if (_userService.UpdateUserProfile(userProfile))

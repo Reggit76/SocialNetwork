@@ -1,0 +1,100 @@
+﻿@model SocialNetwork.Models.ViewModels.FriendshipViewModel
+
+@{
+    ViewData["Title"] = "Friends";
+    var selectedTab = Model.SelectedTab ?? "Friends"; // Устанавливаем вкладку по умолчанию
+}
+
+<div style="display: flex;">
+    <div style="width: 30%; padding: 10px;">
+        <h2>
+            <button onclick="showTab('Friends')">Friends</button> |
+            <button onclick="showTab('AllUsers')">All Users</button>
+        </h2>
+        <div id="Friends" style="display: @(selectedTab == "Friends" ? "block" : "none")">
+            <form method="get" asp-action="Index">
+                <input type="hidden" name="tab" value="Friends" />
+                <input type="text" name="searchTerm" placeholder="Search friends..." value="@Model.SearchTerm" />
+                <button type="submit">Search</button>
+            </form>
+            <h3>Incoming Requests</h3>
+            <ul>
+                @foreach (var request in Model.IncomingRequests ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
+                {
+                    <li>
+                        <a asp-action="UserDetails" asp-route-userId="@request.UserId">@request.FullName</a>
+                    </li>
+                }
+            </ul>
+            <h3>Friends</h3>
+            <ul>
+                @foreach (var friend in Model.Friends ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
+                {
+                    <li>
+                        <a asp-action="UserDetails" asp-route-userId="@friend.UserId">@friend.FullName</a>
+                    </li>
+                }
+            </ul>
+        </div>
+        <div id="AllUsers" style="display: @(selectedTab == "AllUsers" ? "block" : "none")">
+            <form method="get" asp-action="Index">
+                <input type="hidden" name="tab" value="AllUsers" />
+                <input type="text" name="searchTerm" placeholder="Search users..." value="@Model.SearchTerm" />
+                <button type="submit">Search</button>
+            </form>
+            <ul>
+                @foreach (var user in Model.AllUsers ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
+                {
+                    <li>
+                        <a asp-action="UserDetails" asp-route-userId="@user.UserId">@user.FullName</a>
+                    </li>
+                }
+            </ul>
+        </div>
+    </div>
+    <div style="width: 70%; padding: 10px;">
+        @if (Model.SelectedUser != null)
+        {
+            <h2>@Model.SelectedUser.FullName</h2>
+            <p>Gender: @Model.SelectedUser.Gender</p>
+            <p>Date of Birth: @Model.SelectedUser.DateOfBirth.ToShortDateString()</p>
+            <p>Role: @Model.SelectedUser.Role</p>
+            <img src="@Model.SelectedUser.ProfilePictureUrl" alt="Profile Picture" />
+
+            @if (Model.IsFriend)
+            {
+                <form method="post" asp-action="RemoveFriend">
+                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
+                    <button type="submit">Remove Friend</button>
+                </form>
+            }
+            else if (Model.HasPendingRequest)
+            {
+                <form method="post" asp-action="AcceptFriendRequest">
+                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
+                    <button type="submit">Accept Friend Request</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-action="SendFriendRequest">
+                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
+                    <button type="submit">Send Friend Request</button>
+                </form>
+            }
+        }
+        else
+        {
+            <p>Select a user to see details.</p>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        function showTab(tabName) {
+            document.getElementById('Friends').style.display = (tabName === 'Friends') ? 'block' : 'none';
+            document.getElementById('AllUsers').style.display = (tabName === 'AllUsers') ? 'block' : 'none';
+        }
+    </script>
+}
