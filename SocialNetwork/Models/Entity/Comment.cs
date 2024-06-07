@@ -9,7 +9,7 @@
         public DateTime DatePosted { get; set; }
 
         public virtual Post? Post { get; set; }
-        public virtual UserProfile? User { get; set; }
+        public virtual User? User { get; set; }
         public virtual ICollection<Comment> Replies { get; set; } = new List<Comment>();
 
         public int? ParentCommentId { get; set; }

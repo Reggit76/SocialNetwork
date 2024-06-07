@@ -1,16 +1,18 @@
-﻿using SocialNetwork.Models.DTO;
+﻿using System.Collections.Generic;
+using SocialNetwork.Models.DTO;
 
 namespace SocialNetwork.Services.Interfaces
 {
     public interface IPostService
     {
-        void AddComment(CommentDTO commentDTO);
+        IEnumerable<PostDTO> GetAllPosts();
+        PostDTO GetPostById(int id);
         void CreatePost(PostDTO postDTO);
-        void DeleteComment(int commentId);
-        void DeletePost(int postId);
-        List<PostDTO> GetAllPosts();
-        PostDTO GetPostById(int postId);
-        void UpdateComment(CommentDTO commentDTO);
         void UpdatePost(PostDTO postDTO);
+        void DeletePost(int id);
+        void AddComment(CommentDTO commentDTO);
+        void UpdateComment(CommentDTO commentDTO);
+        void DeleteComment(int commentId);
+        IEnumerable<PostDTO> GetUserPosts(int userId);
     }
 }

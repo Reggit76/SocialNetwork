@@ -10,9 +10,9 @@ namespace SocialNetwork.Services
 {
     public class MessageService : IMessageService
     {
-        private readonly UserDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public MessageService(UserDbContext context)
+        public MessageService(ApplicationDbContext context)
         {
             _context = context;
         }

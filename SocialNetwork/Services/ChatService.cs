@@ -10,10 +10,10 @@ namespace SocialNetwork.Services
 {
     public class ChatService : IChatService
     {
-        private readonly UserDbContext _context;
+        private readonly ApplicationDbContext _context;
         private readonly IMessageService _messageService;
 
-        public ChatService(UserDbContext context, IMessageService messageService)
+        public ChatService(ApplicationDbContext context, IMessageService messageService)
         {
             _context = context;
             _messageService = messageService;
@@ -40,20 +40,20 @@ namespace SocialNetwork.Services
                 .ThenInclude(c => c.Messages)
                 .Include(cu => cu.Chat)
                 .ThenInclude(c => c.Participants)
-                .ThenInclude(cp => cp.UserProfile)
+                .ThenInclude(cp => cp.User)
                 .Select(cu => new ChatDTO
                 {
                     Id = cu.Chat.Id,
                     Name = cu.Chat.Name,
                     Description = cu.Chat.Description,
-                    Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
+                    Participants = cu.Chat.Participants.Select(p => new UserDTO
                     {
-                        UserId = p.UserProfile.UserId,
-                        FullName = p.UserProfile.FullName,
-                        Gender = p.UserProfile.Gender,
-                        DateOfBirth = p.UserProfile.DateOfBirth,
-                        ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
-                        Role = p.UserProfile.Role
+                        UserId = p.User.UserId,
+                        FullName = p.User.FullName,
+                        Gender = p.User.Gender,
+                        DateOfBirth = p.User.DateOfBirth,
+                        ProfilePictureUrl = p.User.ProfilePictureUrl,
+                        Role = p.User.Role
                     }).ToList(),
                     Messages = cu.Chat.Messages.Select(m => new MessageDTO
                     {
@@ -71,7 +71,7 @@ namespace SocialNetwork.Services
             var chat = _context.Chats
                 .Include(c => c.Messages)
                 .Include(c => c.Participants)
-                .ThenInclude(cp => cp.UserProfile)
+                .ThenInclude(cp => cp.User)
                 .FirstOrDefault(c => c.Id == chatId);
 
             if (chat == null)
@@ -82,14 +82,14 @@ namespace SocialNetwork.Services
                 Id = chat.Id,
                 Name = chat.Name,
                 Description = chat.Description,
-                Participants = chat.Participants.Select(p => new UserProfileDTO
+                Participants = chat.Participants.Select(p => new UserDTO
                 {
-                    UserId = p.UserProfile.UserId,
-                    FullName = p.UserProfile.FullName,
-                    Gender = p.UserProfile.Gender,
-                    DateOfBirth = p.UserProfile.DateOfBirth,
-                    ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
-                    Role = p.UserProfile.Role
+                    UserId = p.User.UserId,
+                    FullName = p.User.FullName,
+                    Gender = p.User.Gender,
+                    DateOfBirth = p.User.DateOfBirth,
+                    ProfilePictureUrl = p.User.ProfilePictureUrl,
+                    Role = p.User.Role
                 }).ToList(),
                 Messages = chat.Messages.Select(m => new MessageDTO
                 {
@@ -143,19 +143,19 @@ namespace SocialNetwork.Services
             _messageService.SendMessage(senderId, chatId, content);
         }
 
-        public List<UserProfileDTO> GetParticipants(int chatId)
+        public List<UserDTO> GetParticipants(int chatId)
         {
             return _context.ChatUsers
                 .Where(cu => cu.ChatId == chatId)
-                .Include(cu => cu.UserProfile)
-                .Select(cu => new UserProfileDTO
+                .Include(cu => cu.User)
+                .Select(cu => new UserDTO
                 {
-                    UserId = cu.UserProfile.UserId,
-                    FullName = cu.UserProfile.FullName,
-                    Gender = cu.UserProfile.Gender,
-                    DateOfBirth = cu.UserProfile.DateOfBirth,
-                    ProfilePictureUrl = cu.UserProfile.ProfilePictureUrl,
-                    Role = cu.UserProfile.Role
+                    UserId = cu.User.UserId,
+                    FullName = cu.User.FullName,
+                    Gender = cu.User.Gender,
+                    DateOfBirth = cu.User.DateOfBirth,
+                    ProfilePictureUrl = cu.User.ProfilePictureUrl,
+                    Role = cu.User.Role
                 }).ToList();
         }
     }

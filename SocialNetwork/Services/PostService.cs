@@ -3,7 +3,6 @@ using SocialNetwork.Data;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Services.Interfaces;
-using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -11,19 +10,18 @@ namespace SocialNetwork.Services
 {
     public class PostService : IPostService
     {
-        private readonly UserDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public PostService(UserDbContext context)
+        public PostService(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        public List<PostDTO> GetAllPosts()
+        public IEnumerable<PostDTO> GetAllPosts()
         {
-            var posts = _context.Posts
+            return _context.Posts
+                .Include(p => p.Author)
                 .Include(p => p.Comments)
-                .Include(p => p.Tags)
-                .AsSplitQuery() // Вручную указываем разделение запросов
                 .Select(p => new PostDTO
                 {
                     Id = p.Id,
@@ -31,32 +29,19 @@ namespace SocialNetwork.Services
                     Content = p.Content,
                     DatePosted = p.DatePosted,
                     LikesCount = p.LikesCount,
-                    Tags = p.Tags.Select(t => t.Tag).ToList(),
-                    Comments = p.Comments.Select(c => new CommentDTO
-                    {
-                        Id = c.Id,
-                        PostId = c.PostId,
-                        UserId = c.UserId,
-                        Content = c.Content,
-                        DatePosted = c.DatePosted
-                    }).ToList()
-                }).ToList();
-
-            return posts;
+                    ImageUrl = p.ImageUrl // Учитываем ImageUrl
+                })
+                .ToList();
         }
 
-        public PostDTO GetPostById(int postId)
+        public PostDTO GetPostById(int id)
         {
             var post = _context.Posts
+                .Include(p => p.Author)
                 .Include(p => p.Comments)
-                .Include(p => p.Tags)
-                .AsSplitQuery() // Вручную указываем разделение запросов
-                .FirstOrDefault(p => p.Id == postId);
+                .FirstOrDefault(p => p.Id == id);
 
-            if (post == null)
-            {
-                return null;
-            }
+            if (post == null) return null;
 
             return new PostDTO
             {
@@ -65,38 +50,20 @@ namespace SocialNetwork.Services
                 Content = post.Content,
                 DatePosted = post.DatePosted,
                 LikesCount = post.LikesCount,
-                Tags = post.Tags.Select(t => t.Tag).ToList(),
-                Comments = post.Comments.Select(c => new CommentDTO
-                {
-                    Id = c.Id,
-                    PostId = c.PostId,
-                    UserId = c.UserId,
-                    Content = c.Content,
-                    DatePosted = c.DatePosted
-                }).ToList()
+                ImageUrl = post.ImageUrl // Учитываем ImageUrl
             };
         }
 
         public void CreatePost(PostDTO postDTO)
         {
-            if (!_context.UserProfiles.Any(up => up.UserId == postDTO.UserId))
-            {
-                throw new ArgumentException("UserId does not exist in UserProfiles.");
-            }
-
             var post = new Post
             {
                 UserId = postDTO.UserId,
                 Content = postDTO.Content,
-                DatePosted = DateTime.UtcNow,
-                LikesCount = 0
+                DatePosted = postDTO.DatePosted,
+                LikesCount = postDTO.LikesCount,
+                ImageUrl = postDTO.ImageUrl // Учитываем ImageUrl
             };
-
-            post.Tags = postDTO.Tags.Select(tag => new PostTag
-            {
-                Post = post,
-                Tag = tag
-            }).ToList();
 
             _context.Posts.Add(post);
             _context.SaveChanges();
@@ -104,28 +71,21 @@ namespace SocialNetwork.Services
 
         public void UpdatePost(PostDTO postDTO)
         {
-            var post = _context.Posts
-                .Include(p => p.Tags)
-                .FirstOrDefault(p => p.Id == postDTO.Id);
-
+            var post = _context.Posts.Find(postDTO.Id);
             if (post != null)
             {
                 post.Content = postDTO.Content;
-
-                post.Tags.Clear();
-                post.Tags = postDTO.Tags.Select(tag => new PostTag
-                {
-                    PostId = post.Id,
-                    Tag = tag
-                }).ToList();
+                post.DatePosted = postDTO.DatePosted;
+                post.LikesCount = postDTO.LikesCount;
+                post.ImageUrl = postDTO.ImageUrl; // Учитываем ImageUrl
 
                 _context.SaveChanges();
             }
         }
 
-        public void DeletePost(int postId)
+        public void DeletePost(int id)
         {
-            var post = _context.Posts.FirstOrDefault(p => p.Id == postId);
+            var post = _context.Posts.Find(id);
             if (post != null)
             {
                 _context.Posts.Remove(post);
@@ -165,6 +125,23 @@ namespace SocialNetwork.Services
                 _context.Comments.Remove(comment);
                 _context.SaveChanges();
             }
+        }
+
+        public IEnumerable<PostDTO> GetUserPosts(int userId)
+        {
+            return _context.Posts
+                .Where(p => p.UserId == userId)
+                .Include(p => p.Author)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl 
+                })
+                .ToList();
         }
     }
 }

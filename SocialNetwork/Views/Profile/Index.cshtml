@@ -1,0 +1,33 @@
+﻿@model SocialNetwork.Models.ViewModels.UserProfileViewModel
+
+@{
+    ViewData["Title"] = "Profile";
+    var avatar = Model.ProfilePictureUrl ?? "~/images/default-avatar.png";
+}
+
+<div class="profile-container">
+    <div class="profile-avatar-container">
+        <img src="@avatar" alt="Avatar" class="profile-avatar">
+        <h2>@Model.FullName</h2>
+        @if (User.Identity.Name == Model.FullName) // Или используйте подходящее поле для проверки текущего пользователя
+        {
+            <a class="btn btn-primary" href="@Url.Action("EditProfile", new { userId = Model.UserId })">Edit</a>
+        }
+    </div>
+    <div class="profile-details">
+        <h3>Details</h3>
+        <p>@Model.DateOfBirth.ToString("d")</p>
+        <p>@Model.Gender</p>
+        <p>@Model.Role</p>
+    </div>
+</div>
+
+<div class="posts-container">
+    <h3>Posts</h3>
+    <div id="posts-container">
+        @foreach (var post in Model.Posts)
+        {
+            @Html.Partial("_Post", post)
+        }
+    </div>
+</div>

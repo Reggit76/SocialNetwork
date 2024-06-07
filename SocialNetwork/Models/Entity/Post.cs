@@ -7,8 +7,9 @@
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
         public int LikesCount { get; set; }
+        public string? ImageUrl { get; set; }
 
-        public virtual UserProfile? User { get; set; }
+        public virtual User? Author { get; set; }
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
         public virtual List<PostTag> Tags { get; set; } = new List<PostTag>();
 

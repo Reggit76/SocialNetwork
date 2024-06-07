@@ -15,7 +15,6 @@ namespace SocialNetwork.Controllers
             _postService = postService;
         }
 
-        [HttpGet]
         public IActionResult Index()
         {
             var posts = _postService.GetAllPosts();
@@ -29,19 +28,13 @@ namespace SocialNetwork.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Create(PostDTO postDTO)
         {
             if (ModelState.IsValid)
             {
-                try
-                {
-                    _postService.CreatePost(postDTO);
-                    return RedirectToAction("Index");
-                }
-                catch (ArgumentException ex)
-                {
-                    ModelState.AddModelError(string.Empty, ex.Message);
-                }
+                _postService.CreatePost(postDTO);
+                return RedirectToAction(nameof(Index));
             }
             return View(postDTO);
         }
@@ -58,25 +51,23 @@ namespace SocialNetwork.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Edit(PostDTO postDTO)
         {
             if (ModelState.IsValid)
             {
                 _postService.UpdatePost(postDTO);
-                return RedirectToAction("Index");
+                return RedirectToAction(nameof(Index));
             }
             return View(postDTO);
         }
 
-        [HttpGet]
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult Delete(int id)
         {
-            var post = _postService.GetPostById(id);
-            if (post == null)
-            {
-                return NotFound();
-            }
-            return View(post);
+            _postService.DeletePost(id);
+            return RedirectToAction(nameof(Index));
         }
 
         [HttpPost, ActionName("Delete")]

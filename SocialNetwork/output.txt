@@ -1,0 +1,4276 @@
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Program.cs
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.EntityFrameworkCore;
+using SocialNetwork.Data;
+using SocialNetwork.Services;
+using SocialNetwork.Services.Interfaces;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Add services to the container.
+builder.Services.AddControllersWithViews();
+
+builder.Services.AddDbContext<ApplicationDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+    o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+);
+
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IFriendshipService, FriendshipService>();
+builder.Services.AddScoped<IPostService, PostService>();
+builder.Services.AddScoped<IChatService, ChatService>();
+builder.Services.AddScoped<IMessageService, MessageService>();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
+})
+.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
+{
+    options.LoginPath = "/Account/Login";
+    options.LogoutPath = "/Account/Logout";
+    options.ExpireTimeSpan = TimeSpan.FromDays(7);
+    options.SlidingExpiration = true;
+});
+
+var app = builder.Build();
+
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
+{
+    app.UseExceptionHandler("/Home/Error");
+    app.UseHsts();
+}
+
+app.UseHttpsRedirection();
+app.UseStaticFiles();
+
+app.UseRouting();
+
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Home}/{action=Index}/{id?}");
+
+app.Run();
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\AccountController.cs
+﻿using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using NuGet.Protocol;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Services;
+using SocialNetwork.Services.Interfaces;
+using System.Collections.Generic;
+using System.Security.Claims;
+using System.Threading.Tasks;
+
+namespace SocialNetwork.Controllers
+{
+    public class AccountController : Controller
+    {
+        private readonly IUserService _userService;
+
+        public AccountController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
+        [HttpGet]
+        public IActionResult Register()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Register(RegisterViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                if (_userService.RegisterUser(model.Username, model.Email, model.Password))
+                {
+                    var user = _userService.AuthenticateUser(model.Username, model.Password);
+                    if (user != null)
+                    {
+                        await AuthenticateUserAsync(user);
+                        TempData["UserId"] = user.Id;
+                        return RedirectToAction("CompleteProfile");
+                    }
+                }
+                ModelState.AddModelError("", "Registration failed");
+            }
+            return View(model);
+        }
+
+        private async Task AuthenticateUserAsync(UserDTO user)
+        {
+            var claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, user.Username),
+                new Claim("UserId", user.Id.ToString())
+            };
+
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
+        }
+
+        [HttpGet]
+        public IActionResult Login()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> Login(LoginViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = _userService.AuthenticateUser(model.Username, model.Password);
+                if (user != null)
+                {
+                    var claims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.Name, user.Username),
+                        new Claim("UserId", user.Id.ToString())
+                    };
+
+                    var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+                    var authProperties = new AuthenticationProperties
+                    {
+                        IsPersistent = model.RememberMe, // Использование свойства RememberMe
+                    };
+
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
+
+                    return RedirectToAction("Index", "Home");
+                }
+                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
+            }
+            return View(model);
+        }
+
+        [HttpGet]
+        [Authorize]
+        public async Task<IActionResult> Logout()
+        {
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login", "Account");
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "Administrator")]
+        public IActionResult RegisterAdmin()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator")]
+        public IActionResult RegisterAdmin(RegisterAdminViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                if (_userService.RegisterUserAsAdmin(model.Username, model.Email, model.Password, model.Role))
+                {
+                    return RedirectToAction("ManageUsers");
+                }
+                ModelState.AddModelError("", "Registration failed");
+            }
+            return View(model);
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "Administrator")]
+        public IActionResult ManageUsers()
+        {
+            var users = _userService.GetAllUsers();
+            return View(users);
+        }
+
+        [HttpGet]
+        [Authorize]
+        public IActionResult CompleteProfile()
+        {
+            if (TempData["UserId"] is int userId)
+            {
+                return View(new UserProfileViewModel { UserId = userId });
+            }
+
+            // Если UserId не найден в TempData, отобразим сообщение об ошибке
+            ModelState.AddModelError("", "Unable to complete profile. Please try again.");
+            return RedirectToAction("Login");
+        }
+
+        [HttpPost]
+        [Authorize]
+        public IActionResult CompleteProfile(UserProfileViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var User = new UserDTO
+                {
+                    UserId = model.UserId,
+                    FullName = model.FullName,
+                    Gender = model.Gender,
+                    DateOfBirth = model.DateOfBirth,
+                    ProfilePictureUrl = model.ProfilePictureUrl
+                };
+                _userService.UpdateUserProfile(User);
+                return RedirectToAction("Index", "Home");
+            }
+            ModelState.AddModelError("", "Failed to complete profile");
+            return View(model);
+        }
+
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\ChatController.cs
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Services.Interfaces;
+using System.Linq;
+using System.Security.Claims;
+
+namespace SocialNetwork.Controllers
+{
+    [Authorize]
+    public class ChatController : Controller
+    {
+        private readonly IChatService _chatService;
+        private readonly IUserService _userService;
+
+        public ChatController(IChatService chatService, IUserService userService)
+        {
+            _chatService = chatService;
+            _userService = userService;
+        }
+
+        public IActionResult Index()
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            var chats = _chatService.GetUserChats(userId);
+            return View(chats);
+        }
+
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        public IActionResult Create(ChatViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var participantIds = model.Participants.Split(',')
+                    .Select(id => int.Parse(id)).ToList();
+
+                _chatService.CreateChat(model.Name, model.Description, participantIds);
+                return RedirectToAction("Index");
+            }
+            return View(model);
+        }
+
+        public IActionResult Details(int id)
+        {
+            var chat = _chatService.GetChat(id);
+            return View(chat);
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\FriendshipController.cs
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Services.Interfaces;
+
+namespace SocialNetwork.Controllers
+{
+    [Authorize]
+    public class FriendshipController : Controller
+    {
+        private readonly IFriendshipService _friendshipService;
+        private readonly IUserService _userService;
+
+        public FriendshipController(IFriendshipService friendshipService, IUserService userService)
+        {
+            _friendshipService = friendshipService;
+            _userService = userService;
+        }
+
+        public IActionResult Index()
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            var friends = _friendshipService.GetFriends(userId);
+            var allUsers = _userService.GetAllUsers();
+            var incomingRequests = _friendshipService.GetPendingRequests(userId);
+
+            var model = new FriendshipViewModel
+            {
+                Friends = friends,
+                AllUsers = allUsers,
+                IncomingRequests = incomingRequests,
+                SelectedTab = "Friends"
+            };
+
+            return View(model);
+        }
+
+        public IActionResult AllUsers()
+        {
+            var allUsers = _userService.GetAllUsers();
+            return PartialView("_AllUsers", allUsers);
+        }
+
+        [HttpPost]
+        public IActionResult SendRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.SendFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult AcceptRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.AcceptFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult DeclineRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.DeclineFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult RemoveFriend(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.RemoveFriend(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        public IActionResult GetUserDetails(int id)
+        {
+            var user = _userService.GetUserProfile(id);
+            var userId = _userService.GetUserId(User.Identity.Name);
+            var friendshipStatus = _friendshipService.GetFriendshipStatus(userId, id);
+
+            var model = new FriendshipViewModel
+            {
+                SelectedUser = user,
+                FriendshipStatus = friendshipStatus
+            };
+
+            return PartialView("_UserDetails", model);
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\HomeController.cs
+using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.Models;
+using System.Diagnostics;
+using SocialNetwork.Models.ViewModels;
+
+namespace SocialNetwork.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly ILogger<HomeController> _logger;
+
+        public HomeController(ILogger<HomeController> logger)
+        {
+            _logger = logger;
+        }
+
+        public IActionResult Index()
+        {
+            return View();
+        }
+
+        public IActionResult Privacy()
+        {
+            return View();
+        }
+
+        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
+        public IActionResult Error()
+        {
+            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\PostController.cs
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Services;
+
+namespace SocialNetwork.Controllers
+{
+    [Authorize]
+    public class PostController : Controller
+    {
+        private readonly PostService _postService;
+
+        public PostController(PostService postService)
+        {
+            _postService = postService;
+        }
+
+        public IActionResult Index()
+        {
+            var posts = _postService.GetAllPosts();
+            return View(posts);
+        }
+
+        [HttpGet]
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Create(PostDTO postDTO)
+        {
+            if (ModelState.IsValid)
+            {
+                _postService.CreatePost(postDTO);
+                return RedirectToAction(nameof(Index));
+            }
+            return View(postDTO);
+        }
+
+        [HttpGet]
+        public IActionResult Edit(int id)
+        {
+            var post = _postService.GetPostById(id);
+            if (post == null)
+            {
+                return NotFound();
+            }
+            return View(post);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Edit(PostDTO postDTO)
+        {
+            if (ModelState.IsValid)
+            {
+                _postService.UpdatePost(postDTO);
+                return RedirectToAction(nameof(Index));
+            }
+            return View(postDTO);
+        }
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public IActionResult Delete(int id)
+        {
+            _postService.DeletePost(id);
+            return RedirectToAction(nameof(Index));
+        }
+
+        [HttpPost, ActionName("Delete")]
+        public IActionResult DeleteConfirmed(int id)
+        {
+            _postService.DeletePost(id);
+            return RedirectToAction("Index");
+        }
+
+        public IActionResult Details(int id)
+        {
+            var post = _postService.GetPostById(id);
+            if (post == null)
+            {
+                return NotFound();
+            }
+            return View(post);
+        }
+
+        [HttpPost]
+        public IActionResult AddComment(CommentDTO commentDTO)
+        {
+            if (ModelState.IsValid)
+            {
+                _postService.AddComment(commentDTO);
+                return RedirectToAction("Details", new { id = commentDTO.PostId });
+            }
+            return RedirectToAction("Details", new { id = commentDTO.PostId });
+        }
+
+        [HttpPost]
+        public IActionResult DeleteComment(int commentId, int postId)
+        {
+            _postService.DeleteComment(commentId);
+            return RedirectToAction("Details", new { id = postId });
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\ProfileController.cs
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Services.Interfaces;
+using System.Linq;
+
+namespace SocialNetwork.Controllers
+{
+    [Authorize]
+    public class ProfileController : Controller
+    {
+        private readonly IUserService _userService;
+        private readonly IPostService _postService;
+
+        public ProfileController(IUserService userService, IPostService postService)
+        {
+            _userService = userService;
+            _postService = postService;
+        }
+
+        public IActionResult Index()
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            var User = _userService.GetUserProfile(userId);
+            var posts = _postService.GetUserPosts(userId).ToList();
+
+            var model = new UserProfileViewModel
+            {
+                UserId = User.UserId,
+                FullName = User.FullName,
+                DateOfBirth = User.DateOfBirth,
+                ProfilePictureUrl = User.ProfilePictureUrl,
+                Gender = User.Gender,
+                Role = User.Role,
+                Posts = posts
+            };
+
+            return View(model);
+        }
+
+        [HttpGet]
+        public IActionResult EditProfile(int userId)
+        {
+            var User = _userService.GetUserProfile(userId);
+
+            if (User == null)
+            {
+                return NotFound(); // Или любой другой обработчик ошибок
+            }
+
+            var model = new EditProfileViewModel
+            {
+                UserId = User.UserId,
+                FullName = User.FullName,
+                DateOfBirth = User.DateOfBirth,
+                ProfilePictureUrl = User.ProfilePictureUrl,
+                Gender = User.Gender,
+                Role = User.Role
+            };
+
+            return View(model);
+        }
+
+        [HttpPost]
+        public IActionResult EditProfile(EditProfileViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var UserDTO = new UserDTO
+                {
+                    UserId = model.UserId,
+                    FullName = model.FullName,
+                    DateOfBirth = model.DateOfBirth,
+                    ProfilePictureUrl = model.ProfilePictureUrl,
+                    Gender = model.Gender,
+                    Role = model.Role
+                };
+
+                _userService.UpdateUserProfile(UserDTO);
+                return RedirectToAction("Index");
+            }
+
+            return View(model);
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Controllers\UsersController.cs
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using System.Linq;
+using System.Threading.Tasks;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Services.Interfaces;
+using SocialNetwork.Models;
+using SocialNetwork.Models.Entity;
+
+namespace SocialNetwork.Controllers
+{
+    [Authorize(Roles = "Administrator, Moderator")]
+    public class UsersController : Controller
+    {
+        private readonly IUserService _userService;
+
+        public UsersController(IUserService userService)
+        {
+            _userService = userService;
+        }
+
+        public async Task<IActionResult> Index(string search)
+        {
+            var users = await _userService.GetAllUsersAsync();
+
+            if (!string.IsNullOrEmpty(search))
+            {
+                users = users.Where(u => u.Username.Contains(search) || u.Email.Contains(search)).ToList();
+            }
+
+            return View(users);
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "Administrator, Moderator")]
+        public async Task<IActionResult> Edit(int id)
+        {
+            var user = await _userService.GetUserProfileAsync(id);
+            if (user == null)
+            {
+                return NotFound();
+            }
+            var model = new EditProfileViewModel
+            {
+                Id = user.UserId,
+                Username = user.Username,
+                Email = user.Email,
+                Gender = user.Gender,
+                AvatarUrl = user.ProfilePictureUrl,
+                Description = user.Description
+            };
+            return View(model);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator, Moderator")]
+        public async Task<IActionResult> Edit(EditProfileViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = await _userService.GetUserProfileAsync(model.Id);
+                if (user == null)
+                {
+                    return NotFound();
+                }
+
+                user.Username = model.Username;
+                user.Email = model.Email;
+                user.Gender = model.Gender;
+                user.ProfilePictureUrl = model.AvatarUrl;
+                user.Description = model.Description;
+
+                await _userService.UpdateUserProfileAsync(user);
+                return RedirectToAction("Index");
+            }
+            return View(model);
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator")]
+        public async Task<IActionResult> ChangeRole(int id, string role)
+        {
+            var user = await _userService.GetUserProfileAsync(id);
+            if (user == null || user.Role == Role.Administrator)
+            {
+                return BadRequest("Invalid user or role.");
+            }
+
+            if ((role == "Administrator" && User.IsInRole("Administrator") && user.Role != Role.Administrator) ||
+                (role == "Moderator" && User.IsInRole("Administrator") && user.Role != Role.Administrator) ||
+                (role == "RegularUser" && User.IsInRole("Administrator") && user.Role != Role.Administrator))
+            {
+                await _userService.ChangeUserRoleAsync(id, role);
+            }
+            else
+            {
+                return Forbid();
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator, Moderator")]
+        public async Task<IActionResult> BanUser(int id)
+        {
+            var user = await _userService.GetUserProfileAsync(id);
+            if (user == null || user.Role == Role.Administrator)
+            {
+                return BadRequest("Invalid user.");
+            }
+
+            if (User.IsInRole("Administrator") || (User.IsInRole("Moderator") && user.Role == Role.RegularUser))
+            {
+                await _userService.BanUserAsync(id);
+            }
+            else
+            {
+                return Forbid();
+            }
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator, Moderator")]
+        public async Task<IActionResult> UnbanUser(int id)
+        {
+            var user = await _userService.GetUserProfileAsync(id);
+            if (user == null)
+            {
+                return BadRequest("Invalid user.");
+            }
+
+            await _userService.UnbanUserAsync(id);
+
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        [Authorize(Roles = "Administrator")]
+        public IActionResult Create()
+        {
+            return View();
+        }
+
+        [HttpPost]
+        [Authorize(Roles = "Administrator")]
+        public async Task<IActionResult> Create(RegisterViewModel model)
+        {
+            if (ModelState.IsValid)
+            {
+                var user = new User
+                {
+                    Username = model.Username,
+                    Email = model.Email,
+                    Gender = model.Gender,
+                    DateOfBirth = model.DateOfBirth,
+                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "/images/default-avatar.png" : model.ProfilePictureUrl,
+                    Description = model.Description,
+                    Role = model.Role,
+                    FullName = model.FullName
+                };
+
+                var result = await _userService.CreateUserAsync(user, model.Password);
+                if (result.Succeeded)
+                {
+                    await _userService.ChangeUserRoleAsync(user.Id, model.Role.ToString());
+                    return RedirectToAction("Index");
+                }
+
+                foreach (var error in result.Errors)
+                {
+                    ModelState.AddModelError(string.Empty, error.Description);
+                }
+            }
+
+            return View(model);
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Data\ApplicationDbContext.cs
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
+using SocialNetwork.Models.Entity;
+
+namespace SocialNetwork.Data
+{
+    public class ApplicationDbContext : DbContext
+    {
+        public DbSet<User> Users { get; set; }
+        public DbSet<Friendship> Friendships { get; set; }
+        public DbSet<Post> Posts { get; set; }
+        public DbSet<Comment> Comments { get; set; }
+        public DbSet<Chat> Chats { get; set; }
+        public DbSet<Message> Messages { get; set; }
+        public DbSet<ChatUser> ChatUsers { get; set; }
+        public DbSet<PostTag> PostTags { get; set; }
+
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
+        {
+            // Включение ленивой загрузки
+            this.ChangeTracker.LazyLoadingEnabled = true;
+        }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+
+            // User entity configuration
+            modelBuilder.Entity<User>()
+                .HasKey(u => u.Id);
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Username)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .HasIndex(u => u.Email)
+                .IsUnique();
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Username)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.Email)
+                .IsRequired()
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<User>()
+                .Property<string>("PasswordHash");
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.FullName)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.ProfilePictureUrl)
+                .HasMaxLength(255);
+
+            modelBuilder.Entity<User>()
+                .Property(u => u.DateOfBirth)
+                .HasColumnType("date");
+
+            // Post entity configuration
+            modelBuilder.Entity<Post>()
+                .HasKey(p => p.Id);
+
+            modelBuilder.Entity<Post>()
+                .Property(p => p.Content)
+                .IsRequired();
+
+            modelBuilder.Entity<Post>()
+                .Property(p => p.DatePosted)
+                .IsRequired();
+
+            modelBuilder.Entity<Post>()
+                .HasOne(p => p.Author)
+                .WithMany()
+                .HasForeignKey(p => p.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // PostTag entity configuration
+            modelBuilder.Entity<PostTag>()
+                .HasKey(pt => new { pt.PostId, pt.Tag });
+
+            modelBuilder.Entity<PostTag>()
+                .HasOne(pt => pt.Post)
+                .WithMany(p => p.Tags)
+                .HasForeignKey(pt => pt.PostId);
+
+            // Comment entity configuration
+            modelBuilder.Entity<Comment>()
+                .HasKey(c => c.Id);
+
+            modelBuilder.Entity<Comment>()
+                .Property(c => c.Content)
+                .IsRequired();
+
+            modelBuilder.Entity<Comment>()
+                .Property(c => c.DatePosted)
+                .IsRequired();
+
+            modelBuilder.Entity<Comment>()
+                .HasOne(c => c.Post)
+                .WithMany(p => p.Comments)
+                .HasForeignKey(c => c.PostId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Comment>()
+                .HasOne(c => c.User)
+                .WithMany()
+                .HasForeignKey(c => c.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Comment>()
+                .HasOne(c => c.ParentComment)
+                .WithMany(c => c.Replies)
+                .HasForeignKey(c => c.ParentCommentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Chat entity configuration
+            modelBuilder.Entity<Chat>()
+                .HasKey(c => c.Id);
+
+            modelBuilder.Entity<Chat>()
+                .Property(c => c.Name)
+                .HasMaxLength(100);
+
+            modelBuilder.Entity<Chat>()
+                .Property(c => c.Description)
+                .HasMaxLength(255);
+
+            // Message entity configuration
+            modelBuilder.Entity<Message>()
+                .HasKey(m => m.Id);
+
+            modelBuilder.Entity<Message>()
+                .Property(m => m.Content)
+                .IsRequired();
+
+            modelBuilder.Entity<Message>()
+                .Property(m => m.Timestamp)
+                .IsRequired();
+
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Chat)
+                .WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ChatId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<Message>()
+                .HasOne(m => m.Sender)
+                .WithMany()
+                .HasForeignKey(m => m.SenderId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            // Friendship entity configuration
+            modelBuilder.Entity<Friendship>()
+                .HasKey(f => new { f.UserId, f.FriendId });
+
+            modelBuilder.Entity<Friendship>()
+                .HasOne(f => f.User)
+                .WithMany()
+                .HasForeignKey(f => f.UserId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            modelBuilder.Entity<Friendship>()
+                .HasOne(f => f.Friend)
+                .WithMany()
+                .HasForeignKey(f => f.FriendId)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            // ChatUser entity configuration (many-to-many relationship)
+            modelBuilder.Entity<ChatUser>()
+                .HasKey(cu => new { cu.ChatId, cu.UserId });
+
+            modelBuilder.Entity<ChatUser>()
+                .HasOne(cu => cu.Chat)
+                .WithMany(c => c.Participants)
+                .HasForeignKey(cu => cu.ChatId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            modelBuilder.Entity<ChatUser>()
+                .HasOne(cu => cu.User)
+                .WithMany(up => up.Chats)
+                .HasForeignKey(cu => cu.UserId)
+                .OnDelete(DeleteBehavior.Cascade);
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Hubs\ChatHub.cs
+﻿using Microsoft.AspNetCore.SignalR;
+using SocialNetwork.Services.Interfaces;
+using System.Threading.Tasks;
+
+namespace SocialNetwork.Hubs
+{
+    public class ChatHub : Hub
+    {
+        private readonly IMessageService _messageService;
+
+        public ChatHub(IMessageService messageService)
+        {
+            _messageService = messageService;
+        }
+
+        public async Task SendMessage(int chatId, int senderId, string content)
+        {
+            _messageService.SendMessage(chatId, senderId, content);
+            await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", senderId, content);
+        }
+
+        public async Task JoinChat(int chatId)
+        {
+            await Groups.AddToGroupAsync(Context.ConnectionId, chatId.ToString());
+        }
+
+        public async Task LeaveChat(int chatId)
+        {
+            await Groups.RemoveFromGroupAsync(Context.ConnectionId, chatId.ToString());
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\ChatDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class ChatDTO
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = null!;
+        public string Description { get; set; } = null!;
+        public List<MessageDTO> Messages { get; set; } = new List<MessageDTO>();
+        public List<UserDTO> Participants { get; set; } = new List<UserDTO>();
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\CommentDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class CommentDTO
+    {
+        public int Id { get; set; }
+        public int PostId { get; set; }
+        public int UserId { get; set; }
+        public string Content { get; set; } = null!;
+        public DateTime DatePosted { get; set; }
+        public List<CommentDTO> Replies { get; set; } = new List<CommentDTO>();
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\FriendshipDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class FriendshipDTO
+    {
+        public int UserId { get; set; }
+        public int FriendId { get; set; }
+        public FriendshipStatus Status { get; set; }
+        public DateTime RequestDate { get; set; }
+        public DateTime? AcceptanceDate { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\MessageDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class MessageDTO
+    {
+        public int Id { get; set; }
+        public int SenderId { get; set; }
+        public int ChatId { get; set; }
+        public string Content { get; set; } = null!;
+        public DateTime Timestamp { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\PostDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class PostDTO
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string Content { get; set; } = string.Empty;
+        public DateTime DatePosted { get; set; }
+        public int LikesCount { get; set; }
+        public string? ImageUrl { get; set; }
+        public UserDTO? AuthorProfile { get; set; }
+
+        public List<string> Tags { get; set; } = new List<string>();
+        public List<CommentDTO> Comments { get; set; } = new List<CommentDTO>();
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\DTO\UserDTO.cs
+﻿namespace SocialNetwork.Models.DTO
+{
+    public class UserDTO
+    {
+        public int UserId { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public string FullName { get; set; }
+        public Gender Gender { get; set; }
+        public DateTime DateOfBirth { get; set; }
+        public string? ProfilePictureUrl { get; set; }
+        public string Description { get; set; }
+        public Role Role { get; set; }
+        public bool IsBanned { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\Chat.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class Chat
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = null!;
+        public string Description { get; set; } = null!;
+
+        public virtual ICollection<Message> Messages { get; set; } = new List<Message>();
+        public virtual ICollection<ChatUser> Participants { get; set; } = new List<ChatUser>();
+
+        public Chat() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\ChatUser.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class ChatUser
+    {
+        public int ChatId { get; set; }
+        public virtual Chat? Chat { get; set; }
+
+        public int UserId { get; set; }
+        public virtual User? User { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\Comment.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class Comment
+    {
+        public int Id { get; set; }
+        public int PostId { get; set; }
+        public int UserId { get; set; }
+        public string Content { get; set; } = null!;
+        public DateTime DatePosted { get; set; }
+
+        public virtual Post? Post { get; set; }
+        public virtual User? User { get; set; }
+        public virtual ICollection<Comment> Replies { get; set; } = new List<Comment>();
+
+        public int? ParentCommentId { get; set; }
+        public virtual Comment? ParentComment { get; set; }
+
+        public Comment() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\Friendship.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class Friendship
+    {
+        public int UserId { get; set; }
+        public int FriendId { get; set; }
+        public FriendshipStatus Status { get; set; }
+        public DateTime RequestDate { get; set; }
+        public DateTime? AcceptanceDate { get; set; }
+
+        public virtual User? User { get; set; }
+        public virtual User? Friend { get; set; }
+
+        public Friendship() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\Message.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class Message
+    {
+        public int Id { get; set; }
+        public int SenderId { get; set; }
+        public int ChatId { get; set; }
+        public string Content { get; set; } = null!;
+        public DateTime Timestamp { get; set; }
+
+        public virtual Chat? Chat { get; set; }
+        public virtual User? Sender { get; set; }
+
+        public Message() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\Post.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class Post
+    {
+        public int Id { get; set; }
+        public int UserId { get; set; }
+        public string Content { get; set; } = null!;
+        public DateTime DatePosted { get; set; }
+        public int LikesCount { get; set; }
+        public string? ImageUrl { get; set; }
+
+        public virtual User? Author { get; set; }
+        public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
+        public virtual List<PostTag> Tags { get; set; } = new List<PostTag>();
+
+        public Post() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\PostTag.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class PostTag
+    {
+        public int PostId { get; set; }
+        public virtual Post? Post { get; set; }
+
+        public string Tag { get; set; } = null!;
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Entity\User.cs
+﻿namespace SocialNetwork.Models.Entity
+{
+    public class User
+    {
+        public int Id { get; set; }
+        public string Username { get; set; } = null!;
+        public string Email { get; set; } = null!;
+        public string FullName { get; set; } = string.Empty;
+        public Gender Gender { get; set; }
+        public DateTime DateOfBirth { get; set; }
+        public string? ProfilePictureUrl { get; set; }
+        public Role Role { get; set; }
+        public bool IsBanned { get; set; } 
+
+        public virtual ICollection<ChatUser> Chats { get; set; } = new List<ChatUser>();
+        public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
+
+        public User() { }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Enums\FriendshipStatus.cs
+﻿namespace SocialNetwork.Models
+{
+    public enum FriendshipStatus
+    {
+        None,        // Нет отношений дружбы
+        Pending,     // Запрос отправлен, но еще не принят
+        Accepted,    // Запрос принят, дружба установлена
+        Declined     // Запрос отклонен
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Enums\Gender.cs
+﻿namespace SocialNetwork.Models
+{
+    public enum Gender
+    {
+        Male, // Мужчина
+        Female, // Женщина
+        Hidden // Скрыт 
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\Enums\Role.cs
+﻿namespace SocialNetwork.Models
+{
+    public enum Role
+    {
+        RegularUser, // Обычный пользователь
+        Moderator, // Модератор
+        Administrator // Администратор
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\ChatViewModel.cs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class ChatViewModel
+    {
+        [Required]
+        public string Name { get; set; }
+
+        [Required]
+        public string Description { get; set; }
+
+        [Required]
+        public string Participants { get; set; } 
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\EditProfileViewModel.cs
+﻿namespace SocialNetwork.Models.ViewModels
+{
+    public class EditProfileViewModel
+    {
+        public int Id { get; set; }
+        public string Username { get; set; }
+        public string Email { get; set; }
+        public Gender Gender { get; set; }
+        public string? AvatarUrl { get; set; }
+        public string Description { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\ErrorViewModel.cs
+namespace SocialNetwork.Models.ViewModels
+{
+    public class ErrorViewModel
+    {
+        public string RequestId { get; set; }
+        public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\FriendshipViewModel.cs
+﻿using System.Collections.Generic;
+using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class FriendshipViewModel
+    {
+        public List<UserDTO> Friends { get; set; }
+        public List<UserDTO> AllUsers { get; set; }
+        public List<UserDTO> IncomingRequests { get; set; }
+        public UserDTO SelectedUser { get; set; }
+        public FriendshipStatus FriendshipStatus { get; set; }
+        public string SelectedTab { get; set; }
+        public string SearchTerm { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\LoginViewModel.cs
+﻿using System.ComponentModel.DataAnnotations;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class LoginViewModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Display(Name = "Remember me?")]
+        public bool RememberMe { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\ProfileEditViewModel.cs
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class ProfileEditViewModel
+    {
+        public int UserId { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "Full name cannot be longer than 100 characters.")]
+        public string FullName { get; set; }
+
+        [Required]
+        public Gender Gender { get; set; }
+
+        [Required]
+        [DataType(DataType.Date)]
+        public DateTime DateOfBirth { get; set; }
+
+        [Url]
+        [StringLength(255, ErrorMessage = "Profile picture URL cannot be longer than 255 characters.")]
+        public string ProfilePictureUrl { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\ProfileViewModel.cs
+﻿using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class ProfileViewModel
+    {
+        public UserDTO User { get; set; }
+        public List<PostDTO> Posts { get; set; }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\RegisterViewModel.cs
+﻿using System;
+using System.ComponentModel.DataAnnotations;
+using SocialNetwork.Models;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class RegisterViewModel
+    {
+        [Required]
+        [StringLength(100, ErrorMessage = "Username cannot be longer than 100 characters.")]
+        public string Username { get; set; } = string.Empty;
+
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        [Required]
+        [DataType(DataType.Password)]
+        [Compare("Password", ErrorMessage = "The password and confirmation password do not match.")]
+        public string ConfirmPassword { get; set; } = string.Empty;
+
+        [Required]
+        public Gender Gender { get; set; }
+
+        [Required]
+        [DataType(DataType.Date)]
+        public DateTime DateOfBirth { get; set; }
+
+        [Url]
+        public string? ProfilePictureUrl { get; set; } = string.Empty;
+
+        public string? Description { get; set; } = string.Empty;
+
+        [Required]
+        public Role Role { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "Full name cannot be longer than 100 characters.")]
+        public string FullName { get; set; } = string.Empty;
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Models\ViewModels\UserProfileViewModel.cs
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Models.ViewModels
+{
+    public class UserProfileViewModel
+    {
+        public int UserId { get; set; }
+
+        [Required]
+        [StringLength(100, ErrorMessage = "Full name cannot be longer than 100 characters.")]
+        public string FullName { get; set; }
+
+        [Required]
+        public Gender Gender { get; set; }
+
+        [Required]
+        [DataType(DataType.Date)]
+        public DateTime DateOfBirth { get; set; }
+
+        [Url]
+        public string? ProfilePictureUrl { get; set; }
+
+        [Required]
+        public Role Role { get; set; }
+
+        public List<PostDTO> Posts { get; set; } = new List<PostDTO>();
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\.NETCoreApp,Version=v7.0.AssemblyAttributes.cs
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v7.0", FrameworkDisplayName = ".NET 7.0")]
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\SocialNetwork.AssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.Extensions.Configuration.UserSecrets.UserSecretsIdAttribute("1298bd6f-b95b-4397-a609-da6a62e9eb18")]
+[assembly: System.Reflection.AssemblyCompanyAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyProductAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyTitleAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\SocialNetwork.GlobalUsings.g.cs
+// <auto-generated/>
+global using global::Microsoft.AspNetCore.Builder;
+global using global::Microsoft.AspNetCore.Hosting;
+global using global::Microsoft.AspNetCore.Http;
+global using global::Microsoft.AspNetCore.Routing;
+global using global::Microsoft.Extensions.Configuration;
+global using global::Microsoft.Extensions.DependencyInjection;
+global using global::Microsoft.Extensions.Hosting;
+global using global::Microsoft.Extensions.Logging;
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Net.Http.Json;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\SocialNetwork.RazorAssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ProvideApplicationPartFactoryAttribute("Microsoft.AspNetCore.Mvc.ApplicationParts.ConsolidatedAssemblyApplicationPartFact" +
+    "ory, Microsoft.AspNetCore.Mvc.Razor")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\scopedcss\bundle\SocialNetwork.styles.css
+/* _content/SocialNetwork/Views/Shared/_Layout.cshtml.rz.scp.css */
+/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand[b-lh69jpwqls] {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a[b-lh69jpwqls] {
+  color: #0077cc;
+}
+
+.btn-primary[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.nav-pills .nav-link.active[b-lh69jpwqls], .nav-pills .show > .nav-link[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.border-top[b-lh69jpwqls] {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom[b-lh69jpwqls] {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow[b-lh69jpwqls] {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy[b-lh69jpwqls] {
+  font-size: 1rem;
+  line-height: inherit;
+}
+
+.footer[b-lh69jpwqls] {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+  line-height: 60px;
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\scopedcss\projectbundle\SocialNetwork.bundle.scp.css
+/* _content/SocialNetwork/Views/Shared/_Layout.cshtml.rz.scp.css */
+/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand[b-lh69jpwqls] {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a[b-lh69jpwqls] {
+  color: #0077cc;
+}
+
+.btn-primary[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.nav-pills .nav-link.active[b-lh69jpwqls], .nav-pills .show > .nav-link[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.border-top[b-lh69jpwqls] {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom[b-lh69jpwqls] {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow[b-lh69jpwqls] {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy[b-lh69jpwqls] {
+  font-size: 1rem;
+  line-height: inherit;
+}
+
+.footer[b-lh69jpwqls] {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+  line-height: 60px;
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net7.0\scopedcss\Views\Shared\_Layout.cshtml.rz.scp.css
+/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand[b-lh69jpwqls] {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a[b-lh69jpwqls] {
+  color: #0077cc;
+}
+
+.btn-primary[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.nav-pills .nav-link.active[b-lh69jpwqls], .nav-pills .show > .nav-link[b-lh69jpwqls] {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.border-top[b-lh69jpwqls] {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom[b-lh69jpwqls] {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow[b-lh69jpwqls] {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy[b-lh69jpwqls] {
+  font-size: 1rem;
+  line-height: inherit;
+}
+
+.footer[b-lh69jpwqls] {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+  line-height: 60px;
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net8.0\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net8.0\SocialNetwork.AssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyProductAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyTitleAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net8.0\SocialNetwork.GlobalUsings.g.cs
+// <auto-generated/>
+global using global::Microsoft.AspNetCore.Builder;
+global using global::Microsoft.AspNetCore.Hosting;
+global using global::Microsoft.AspNetCore.Http;
+global using global::Microsoft.AspNetCore.Routing;
+global using global::Microsoft.Extensions.Configuration;
+global using global::Microsoft.Extensions.DependencyInjection;
+global using global::Microsoft.Extensions.Hosting;
+global using global::Microsoft.Extensions.Logging;
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Net.Http.Json;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Debug\net8.0\SocialNetwork.RazorAssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ProvideApplicationPartFactoryAttribute("Microsoft.AspNetCore.Mvc.ApplicationParts.ConsolidatedAssemblyApplicationPartFact" +
+    "ory, Microsoft.AspNetCore.Mvc.Razor")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Release\net8.0\.NETCoreApp,Version=v8.0.AssemblyAttributes.cs
+// <autogenerated />
+using System;
+using System.Reflection;
+[assembly: global::System.Runtime.Versioning.TargetFrameworkAttribute(".NETCoreApp,Version=v8.0", FrameworkDisplayName = ".NET 8.0")]
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Release\net8.0\SocialNetwork.AssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: System.Reflection.AssemblyCompanyAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
+[assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyProductAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyTitleAttribute("SocialNetwork")]
+[assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Release\net8.0\SocialNetwork.GlobalUsings.g.cs
+// <auto-generated/>
+global using global::Microsoft.AspNetCore.Builder;
+global using global::Microsoft.AspNetCore.Hosting;
+global using global::Microsoft.AspNetCore.Http;
+global using global::Microsoft.AspNetCore.Routing;
+global using global::Microsoft.Extensions.Configuration;
+global using global::Microsoft.Extensions.DependencyInjection;
+global using global::Microsoft.Extensions.Hosting;
+global using global::Microsoft.Extensions.Logging;
+global using global::System;
+global using global::System.Collections.Generic;
+global using global::System.IO;
+global using global::System.Linq;
+global using global::System.Net.Http;
+global using global::System.Net.Http.Json;
+global using global::System.Threading;
+global using global::System.Threading.Tasks;
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\obj\Release\net8.0\SocialNetwork.RazorAssemblyInfo.cs
+//------------------------------------------------------------------------------
+// <auto-generated>
+//     Этот код создан программой.
+//     Исполняемая версия:4.0.30319.42000
+//
+//     Изменения в этом файле могут привести к неправильной работе и будут потеряны в случае
+//     повторной генерации кода.
+// </auto-generated>
+//------------------------------------------------------------------------------
+
+using System;
+using System.Reflection;
+
+[assembly: Microsoft.AspNetCore.Mvc.ApplicationParts.ProvideApplicationPartFactoryAttribute("Microsoft.AspNetCore.Mvc.ApplicationParts.ConsolidatedAssemblyApplicationPartFact" +
+    "ory, Microsoft.AspNetCore.Mvc.Razor")]
+
+// Создано классом WriteCodeFragment MSBuild.
+
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\ChatService.cs
+﻿using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Data;
+using SocialNetwork.Services.Interfaces;
+
+namespace SocialNetwork.Services
+{
+    public class ChatService : IChatService
+    {
+        private readonly ApplicationDbContext _context;
+        private readonly IMessageService _messageService;
+
+        public ChatService(ApplicationDbContext context, IMessageService messageService)
+        {
+            _context = context;
+            _messageService = messageService;
+        }
+
+        public void CreateChat(string name, string description, List<int> participantIds)
+        {
+            var chat = new Chat
+            {
+                Name = name,
+                Description = description,
+                Participants = participantIds.Select(id => new ChatUser { UserId = id }).ToList()
+            };
+
+            _context.Chats.Add(chat);
+            _context.SaveChanges();
+        }
+
+        public List<ChatDTO> GetUserChats(int userId)
+        {
+            return _context.ChatUsers
+                .Where(cu => cu.UserId == userId)
+                .Include(cu => cu.Chat)
+                .ThenInclude(c => c.Messages)
+                .Include(cu => cu.Chat)
+                .ThenInclude(c => c.Participants)
+                .ThenInclude(cp => cp.User)
+                .Select(cu => new ChatDTO
+                {
+                    Id = cu.Chat.Id,
+                    Name = cu.Chat.Name,
+                    Description = cu.Chat.Description,
+                    Participants = cu.Chat.Participants.Select(p => new UserDTO
+                    {
+                        UserId = p.User.UserId,
+                        FullName = p.User.FullName,
+                        Gender = p.User.Gender,
+                        DateOfBirth = p.User.DateOfBirth,
+                        ProfilePictureUrl = p.User.ProfilePictureUrl,
+                        Role = p.User.Role
+                    }).ToList(),
+                    Messages = cu.Chat.Messages.Select(m => new MessageDTO
+                    {
+                        Id = m.Id,
+                        SenderId = m.SenderId,
+                        ChatId = m.ChatId,
+                        Content = m.Content,
+                        Timestamp = m.Timestamp
+                    }).ToList()
+                }).ToList();
+        }
+
+        public ChatDTO GetChat(int chatId)
+        {
+            var chat = _context.Chats
+                .Include(c => c.Messages)
+                .Include(c => c.Participants)
+                .ThenInclude(cp => cp.User)
+                .FirstOrDefault(c => c.Id == chatId);
+
+            if (chat == null)
+                return null;
+
+            return new ChatDTO
+            {
+                Id = chat.Id,
+                Name = chat.Name,
+                Description = chat.Description,
+                Participants = chat.Participants.Select(p => new UserDTO
+                {
+                    UserId = p.User.UserId,
+                    FullName = p.User.FullName,
+                    Gender = p.User.Gender,
+                    DateOfBirth = p.User.DateOfBirth,
+                    ProfilePictureUrl = p.User.ProfilePictureUrl,
+                    Role = p.User.Role
+                }).ToList(),
+                Messages = chat.Messages.Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    ChatId = m.ChatId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList()
+            };
+        }
+
+        public void AddParticipant(int chatId, int userId)
+        {
+            var chatUser = new ChatUser
+            {
+                ChatId = chatId,
+                UserId = userId
+            };
+
+            _context.ChatUsers.Add(chatUser);
+            _context.SaveChanges();
+        }
+
+        public void RemoveParticipant(int chatId, int userId)
+        {
+            var chatUser = _context.ChatUsers.FirstOrDefault(cu => cu.ChatId == chatId && cu.UserId == userId);
+            if (chatUser != null)
+            {
+                _context.ChatUsers.Remove(chatUser);
+                _context.SaveChanges();
+            }
+        }
+
+        public List<MessageDTO> GetMessages(int chatId)
+        {
+            return _context.Messages
+                .Where(m => m.ChatId == chatId)
+                .Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    ChatId = m.ChatId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList();
+        }
+
+        public void SendMessage(int chatId, int senderId, string content)
+        {
+            _messageService.SendMessage(senderId, chatId, content);
+        }
+
+        public List<UserDTO> GetParticipants(int chatId)
+        {
+            return _context.ChatUsers
+                .Where(cu => cu.ChatId == chatId)
+                .Include(cu => cu.User)
+                .Select(cu => new UserDTO
+                {
+                    UserId = cu.User.UserId,
+                    FullName = cu.User.FullName,
+                    Gender = cu.User.Gender,
+                    DateOfBirth = cu.User.DateOfBirth,
+                    ProfilePictureUrl = cu.User.ProfilePictureUrl,
+                    Role = cu.User.Role
+                }).ToList();
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\CommentService.cs
+﻿using SocialNetwork.Data;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Services.Interfaces;
+using System;
+using System.Linq;
+
+namespace SocialNetwork.Services
+{
+    public class CommentService : ICommentService
+    {
+        private readonly ApplicationDbContext _context;
+
+        public CommentService(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public CommentDTO GetCommentById(int commentId)
+        {
+            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            if (comment == null)
+            {
+                return null;
+            }
+            return new CommentDTO
+            {
+                Id = comment.Id,
+                PostId = comment.PostId,
+                UserId = comment.UserId,
+                Content = comment.Content,
+                DatePosted = comment.DatePosted
+            };
+        }
+
+        public void AddComment(CommentDTO commentDTO)
+        {
+            var comment = new Comment
+            {
+                PostId = commentDTO.PostId,
+                UserId = commentDTO.UserId,
+                Content = commentDTO.Content,
+                DatePosted = DateTime.UtcNow // Преобразование в UTC
+            };
+            _context.Comments.Add(comment);
+            _context.SaveChanges();
+        }
+
+        public void UpdateComment(CommentDTO commentDTO)
+        {
+            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentDTO.Id);
+            if (comment != null)
+            {
+                comment.Content = commentDTO.Content;
+                _context.SaveChanges();
+            }
+        }
+
+        public void DeleteComment(int commentId)
+        {
+            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            if (comment != null)
+            {
+                _context.Comments.Remove(comment);
+                _context.SaveChanges();
+            }
+        }
+    }
+}
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\FriendshipService.cs
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.EntityFrameworkCore;
+using SocialNetwork.Data;
+using SocialNetwork.Models;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Services.Interfaces;
+
+namespace SocialNetwork.Services
+{
+    public class FriendshipService : IFriendshipService
+    {
+        private readonly ApplicationDbContext _context;
+
+        public FriendshipService(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public bool SendFriendRequest(int userId, int friendId)
+        {
+            if (_context.Friendships.Any(f => (f.UserId == userId && f.FriendId == friendId) || (f.UserId == friendId && f.FriendId == userId)))
+            {
+                return false; // Дружба уже существует или запрос уже отправлен
+            }
+
+            var friendship = new Friendship
+            {
+                UserId = userId,
+                FriendId = friendId,
+                Status = FriendshipStatus.Pending,
+                RequestDate = DateTime.UtcNow
+            };
+
+            _context.Friendships.Add(friendship);
+            _context.SaveChanges();
+            return true;
+        }
+
+        public bool AcceptFriendRequest(int userId, int friendId)
+        {
+            var friendship = _context.Friendships.FirstOrDefault(f => f.UserId == friendId && f.FriendId == userId && f.Status == FriendshipStatus.Pending);
+            if (friendship != null)
+            {
+                friendship.Status = FriendshipStatus.Accepted;
+                friendship.AcceptanceDate = DateTime.UtcNow;
+                _context.SaveChanges();
+                return true;
+            }
+            return false;
+        }
+
+        public bool DeclineFriendRequest(int userId, int friendId)
+        {
+            var friendship = _context.Friendships.FirstOrDefault(f => f.UserId == friendId && f.FriendId == userId && f.Status == FriendshipStatus.Pending);
+            if (friendship != null)
+            {
+                friendship.Status = FriendshipStatus.Declined;
+                _context.SaveChanges();
+                return true;
+            }
+            return false;
+        }
+
+        public bool RemoveFriend(int userId, int friendId)
+        {
+            var friendship = _context.Friendships.FirstOrDefault(f => (f.UserId == userId && f.FriendId == friendId) || (f.UserId == friendId && f.FriendId == userId));
+            if (friendship != null)
+            {
+                _context.Friendships.Remove(friendship);
+                _context.SaveChanges();
+                return true;
+            }
+            return false;
+        }
+
+        public List<UserDTO> GetFriends(int userId)
+        {
+            return _context.Friendships
+                .Where(f => f.UserId == userId && f.Status == FriendshipStatus.Accepted)
+                .Select(f => new UserDTO
+                {
+                    UserId = f.Friend.UserId,
+                    FullName = f.Friend.FullName,
+                    Gender = f.Friend.Gender,
+                    DateOfBirth = f.Friend.DateOfBirth,
+                    ProfilePictureUrl = f.Friend.ProfilePictureUrl,
+                    Role = f.Friend.Role
+                })
+                .ToList();
+        }
+
+        public List<UserDTO> GetPendingRequests(int userId)
+        {
+            return _context.Friendships
+                .Where(f => f.FriendId == userId && f.Status == FriendshipStatus.Pending)
+                .Select(f => new UserDTO
+                {
+                    UserId = f.User.UserId,
+                    FullName = f.User.FullName,
+                    Gender = f.User.Gender,
+                    DateOfBirth = f.User.DateOfBirth,
+                    ProfilePictureUrl = f.User.ProfilePictureUrl,
+                    Role = f.User.Role
+                })
+                .ToList();
+        }
+
+        public FriendshipStatus GetFriendshipStatus(int userId, int friendId)
+        {
+            var friendship = _context.Friendships.FirstOrDefault(f => (f.UserId == userId && f.FriendId == friendId) || (f.UserId == friendId && f.FriendId == userId));
+            return friendship?.Status ?? FriendshipStatus.None;
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\MessageService.cs
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using SocialNetwork.Data;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Services.Interfaces;
+
+namespace SocialNetwork.Services
+{
+    public class MessageService : IMessageService
+    {
+        private readonly ApplicationDbContext _context;
+
+        public MessageService(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public void SendMessage(int chatId, int senderId, string content)
+        {
+            var message = new Message
+            {
+                ChatId = chatId,
+                SenderId = senderId,
+                Content = content,
+                Timestamp = DateTime.UtcNow
+            };
+
+            _context.Messages.Add(message);
+            _context.SaveChanges();
+        }
+
+        public List<MessageDTO> GetMessages(int chatId)
+        {
+            return _context.Messages
+                .Where(m => m.ChatId == chatId)
+                .Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    ChatId = m.ChatId,
+                    SenderId = m.SenderId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList();
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\PostService.cs
+﻿using Microsoft.EntityFrameworkCore;
+using SocialNetwork.Data;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Services.Interfaces;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace SocialNetwork.Services
+{
+    public class PostService : IPostService
+    {
+        private readonly ApplicationDbContext _context;
+
+        public PostService(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public IEnumerable<PostDTO> GetAllPosts()
+        {
+            return _context.Posts
+                .Include(p => p.Author)
+                .Include(p => p.Comments)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl // Учитываем ImageUrl
+                })
+                .ToList();
+        }
+
+        public PostDTO GetPostById(int id)
+        {
+            var post = _context.Posts
+                .Include(p => p.Author)
+                .Include(p => p.Comments)
+                .FirstOrDefault(p => p.Id == id);
+
+            if (post == null) return null;
+
+            return new PostDTO
+            {
+                Id = post.Id,
+                UserId = post.UserId,
+                Content = post.Content,
+                DatePosted = post.DatePosted,
+                LikesCount = post.LikesCount,
+                ImageUrl = post.ImageUrl // Учитываем ImageUrl
+            };
+        }
+
+        public void CreatePost(PostDTO postDTO)
+        {
+            var post = new Post
+            {
+                UserId = postDTO.UserId,
+                Content = postDTO.Content,
+                DatePosted = postDTO.DatePosted,
+                LikesCount = postDTO.LikesCount,
+                ImageUrl = postDTO.ImageUrl // Учитываем ImageUrl
+            };
+
+            _context.Posts.Add(post);
+            _context.SaveChanges();
+        }
+
+        public void UpdatePost(PostDTO postDTO)
+        {
+            var post = _context.Posts.Find(postDTO.Id);
+            if (post != null)
+            {
+                post.Content = postDTO.Content;
+                post.DatePosted = postDTO.DatePosted;
+                post.LikesCount = postDTO.LikesCount;
+                post.ImageUrl = postDTO.ImageUrl; // Учитываем ImageUrl
+
+                _context.SaveChanges();
+            }
+        }
+
+        public void DeletePost(int id)
+        {
+            var post = _context.Posts.Find(id);
+            if (post != null)
+            {
+                _context.Posts.Remove(post);
+                _context.SaveChanges();
+            }
+        }
+
+        public void AddComment(CommentDTO commentDTO)
+        {
+            commentDTO.DatePosted = DateTime.UtcNow;
+            var comment = new Comment
+            {
+                PostId = commentDTO.PostId,
+                UserId = commentDTO.UserId,
+                Content = commentDTO.Content,
+                DatePosted = commentDTO.DatePosted
+            };
+            _context.Comments.Add(comment);
+            _context.SaveChanges();
+        }
+
+        public void UpdateComment(CommentDTO commentDTO)
+        {
+            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentDTO.Id);
+            if (comment != null)
+            {
+                comment.Content = commentDTO.Content;
+                _context.SaveChanges();
+            }
+        }
+
+        public void DeleteComment(int commentId)
+        {
+            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            if (comment != null)
+            {
+                _context.Comments.Remove(comment);
+                _context.SaveChanges();
+            }
+        }
+
+        public IEnumerable<PostDTO> GetUserPosts(int userId)
+        {
+            return _context.Posts
+                .Where(p => p.UserId == userId)
+                .Include(p => p.Author)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl 
+                })
+                .ToList();
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\UserService.cs
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Data;
+using SocialNetwork.Models;
+using SocialNetwork.Services.Interfaces;
+using SocialNetwork.Models.ViewModels;
+
+namespace SocialNetwork.Services
+{
+    public class UserService : IUserService
+    {
+        private readonly ApplicationDbContext _context;
+
+        public UserService(ApplicationDbContext context)
+        {
+            _context = context;
+        }
+
+        public async Task<int> GetUserIdAsync(string Username)
+        {
+            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == Username);
+            return user?.Id ?? 0;
+        }
+
+        public async Task<bool> RegisterUserAsync(RegisterViewModel model)
+        {
+            if (await _context.Users.AnyAsync(u => u.Username == model.Username || u.Email == model.Email))
+            {
+                return false;
+            }
+
+            if (!IsValidPassword(model.Password))
+            {
+                throw new ArgumentException("Password does not meet the required criteria.");
+            }
+
+            var user = new User
+            {
+                Username = model.Username,
+                Email = model.Email,
+                FullName = model.FullName,
+                Gender = model.Gender,
+                DateOfBirth = model.DateOfBirth,
+                ProfilePictureUrl = model.ProfilePictureUrl,
+                Role = model.Role
+            };
+
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
+
+            var passwordHash = HashPassword(model.Password);
+            SavePasswordHash(user.Id, passwordHash);
+
+            return true;
+        }
+
+        public bool RegisterUserAsAdmin(string username, string email, string password, Role role, string fullName, Gender gender, DateTime dateOfBirth, string? profilePictureUrl, string? description)
+        {
+            if (_context.Users.Any(u => u.Username == username || u.Email == email))
+            {
+                return false;
+            }
+
+            if (!IsValidPassword(password))
+            {
+                throw new ArgumentException("Password does not meet the required criteria.");
+            }
+
+            var user = new User
+            {
+                Username = username,
+                Email = email,
+                FullName = fullName,
+                Gender = gender,
+                DateOfBirth = dateOfBirth,
+                ProfilePictureUrl = profilePictureUrl,
+                Description = description,
+                Role = role
+            };
+
+            _context.Users.Add(user);
+            _context.SaveChanges();
+
+            var passwordHash = HashPassword(password);
+            SavePasswordHash(user.Id, passwordHash);
+
+            return true;
+        }
+
+        public async Task<List<UserDTO>> SearchUsersAsync(string searchTerm)
+        {
+            if (string.IsNullOrWhiteSpace(searchTerm))
+            {
+                return await _context.Users
+                    .Select(u => new UserDTO
+                    {
+                        UserId = u.Id,
+                        FullName = u.FullName,
+                        Email = u.Email,
+                        Gender = u.Gender,
+                        DateOfBirth = u.DateOfBirth,
+                        ProfilePictureUrl = u.ProfilePictureUrl,
+                        Role = u.Role,
+                        Username = u.Username,
+                        IsBanned = u.IsBanned
+                    }).ToListAsync();
+            }
+            return await _context.Users
+                .Where(u => u.FullName.Contains(searchTerm) || u.Username.Contains(searchTerm))
+                .Select(u => new UserDTO
+                {
+                    UserId = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    Gender = u.Gender,
+                    DateOfBirth = u.DateOfBirth,
+                    ProfilePictureUrl = u.ProfilePictureUrl,
+                    Role = u.Role,
+                    Username = u.Username,
+                    IsBanned = u.IsBanned
+                }).ToListAsync();
+        }
+
+        public async Task<UserDTO> AuthenticateUserAsync(string Username, string password)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == Username);
+            if (user != null)
+            {
+                var storedPasswordHash = GetPasswordHash(user.Id);
+                if (VerifyPassword(password, storedPasswordHash))
+                {
+                    return new UserDTO
+                    {
+                        UserId = user.Id,
+                        FullName = user.FullName,
+                        Email = user.Email,
+                        Gender = user.Gender,
+                        DateOfBirth = user.DateOfBirth,
+                        ProfilePictureUrl = user.ProfilePictureUrl,
+                        Role = user.Role,
+                        Username = user.Username,
+                        IsBanned = user.IsBanned
+                    };
+                }
+            }
+
+            return null;
+        }
+
+        public async Task<UserDTO> GetUserProfileAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return null;
+
+            return new UserDTO
+            {
+                UserId = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                Gender = user.Gender,
+                DateOfBirth = user.DateOfBirth,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Role = user.Role,
+                Username = user.Username,
+                IsBanned = user.IsBanned
+            };
+        }
+
+        public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
+        {
+            return await _context.Posts
+                .Where(p => p.UserId == userId)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl
+                }).ToListAsync();
+        }
+
+        public async Task<bool> UpdateUserProfileAsync(UserDTO User)
+        {
+            var user = await _context.Users.FindAsync(User.UserId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.FullName = User.FullName;
+            user.Gender = User.Gender;
+            user.DateOfBirth = User.DateOfBirth;
+            user.ProfilePictureUrl = User.ProfilePictureUrl;
+            user.Email = User.Email;
+            user.Username = User.Username;
+            user.IsBanned = User.IsBanned;
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<List<UserDTO>> GetAllUsersAsync()
+        {
+            return await _context.Users.Select(u => new UserDTO
+            {
+                UserId = u.Id,
+                FullName = u.FullName,
+                Email = u.Email,
+                Gender = u.Gender,
+                DateOfBirth = u.DateOfBirth,
+                ProfilePictureUrl = u.ProfilePictureUrl,
+                Role = u.Role,
+                Username = u.Username,
+                IsBanned = u.IsBanned
+            }).ToListAsync();
+        }
+
+        public async Task<bool> CreateUserAsync(UserDTO User, string password)
+        {
+            if (await _context.Users.AnyAsync(u => u.Username == User.Username || u.Email == User.Email))
+            {
+                return false;
+            }
+
+            if (!IsValidPassword(password))
+            {
+                throw new ArgumentException("Password does not meet the required criteria.");
+            }
+
+            var user = new User
+            {
+                Username = User.Username,
+                Email = User.Email,
+                FullName = User.FullName,
+                Gender = User.Gender,
+                DateOfBirth = User.DateOfBirth,
+                ProfilePictureUrl = User.ProfilePictureUrl,
+                Role = User.Role
+            };
+
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
+
+            var passwordHash = HashPassword(password);
+            SavePasswordHash(user.Id, passwordHash);
+
+            return true;
+        }
+
+        public async Task<bool> ChangeUserRoleAsync(int userId, string role)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || !Enum.TryParse(role, out Role newRole))
+            {
+                return false;
+            }
+
+            user.Role = newRole;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> BanUserAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.IsBanned = true;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> UnbanUserAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.IsBanned = false;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> UpdateUserRoleAsync(int userId, Role newRole)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.Role = newRole;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        private static string HashPassword(string password)
+        {
+            var hashedBytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
+            return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
+        }
+
+        private static bool VerifyPassword(string password, string passwordHash)
+        {
+            var hashedPassword = HashPassword(password);
+            return hashedPassword == passwordHash;
+        }
+
+        private static bool IsValidPassword(string password)
+        {
+            var passwordPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$";
+            return Regex.IsMatch(password, passwordPattern);
+        }
+
+        private void SavePasswordHash(int userId, string passwordHash)
+        {
+            var user = _context.Users.Find(userId);
+            if (user != null)
+            {
+                _context.Entry(user).Property("PasswordHash").CurrentValue = passwordHash;
+                _context.SaveChanges();
+            }
+        }
+
+        private string GetPasswordHash(int userId)
+        {
+            var user = _context.Users.Find(userId);
+            if (user != null)
+            {
+                return _context.Entry(user).Property("PasswordHash").CurrentValue as string;
+            }
+            return null;
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\IChatService.cs
+﻿using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface IChatService
+    {
+        void AddParticipant(int chatId, int userId);
+        void CreateChat(string name, string description, List<int> participantIds);
+        List<ChatDTO> GetUserChats(int userId);
+        ChatDTO GetChat(int chatId);
+        List<MessageDTO> GetMessages(int chatId);
+        List<UserDTO> GetParticipants(int chatId);
+        void RemoveParticipant(int chatId, int userId);
+        void SendMessage(int chatId, int senderId, string content);
+    }
+}
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\ICommentService.cs
+﻿using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface ICommentService
+    {
+        void AddComment(CommentDTO commentDTO);
+        void DeleteComment(int commentId);
+        CommentDTO GetCommentById(int commentId);
+        void UpdateComment(CommentDTO commentDTO);
+    }
+}
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\IFriendshipService.cs
+﻿using System.Collections.Generic;
+using SocialNetwork.Models;
+using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface IFriendshipService
+    {
+        bool SendFriendRequest(int userId, int friendId);
+        bool AcceptFriendRequest(int userId, int friendId);
+        bool DeclineFriendRequest(int userId, int friendId);
+        bool RemoveFriend(int userId, int friendId);
+        List<UserDTO> GetFriends(int userId);
+        List<UserDTO> GetPendingRequests(int userId);
+        FriendshipStatus GetFriendshipStatus(int userId, int friendId);
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\IMessageService.cs
+﻿using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface IMessageService
+    {
+        List<MessageDTO> GetMessages(int userId);
+        void SendMessage(int senderId, int chatId, string content);
+    }
+}
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\IPostService.cs
+﻿using System.Collections.Generic;
+using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface IPostService
+    {
+        IEnumerable<PostDTO> GetAllPosts();
+        PostDTO GetPostById(int id);
+        void CreatePost(PostDTO postDTO);
+        void UpdatePost(PostDTO postDTO);
+        void DeletePost(int id);
+        void AddComment(CommentDTO commentDTO);
+        void UpdateComment(CommentDTO commentDTO);
+        void DeleteComment(int commentId);
+        IEnumerable<PostDTO> GetUserPosts(int userId);
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Services\Interfaces\IUserService.cs
+﻿using SocialNetwork.Models;
+using SocialNetwork.Models.DTO;
+using SocialNetwork.Models.ViewModels;
+using System.Collections.Generic;
+using System.Threading.Tasks;
+
+namespace SocialNetwork.Services.Interfaces
+{
+    public interface IUserService
+    {
+        Task<UserDTO> AuthenticateUserAsync(string Username, string password);
+        Task<List<UserDTO>> GetAllUsersAsync();
+        Task<int> GetUserIdAsync(string Username);
+        Task<UserDTO> GetUserProfileAsync(int userId);
+        Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId);
+        Task<bool> RegisterUserAsync(RegisterViewModel model);
+        Task<bool> RegisterUserAsAdminAsync(string Username, string email, string password, Role role);
+        Task<List<UserDTO>> SearchUsersAsync(string searchTerm);
+        Task<bool> UpdateUserProfileAsync(UserDTO model);
+        Task<bool> UpdateUserRoleAsync(int userId, Role newRole);
+        Task<bool> ChangeUserRoleAsync(int userId, string role);
+        Task<bool> BanUserAsync(int userId);
+        Task<bool> UnbanUserAsync(int userId);
+        Task<bool> CreateUserAsync(UserDTO User, string password);
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\_ViewImports.cshtml
+﻿@using SocialNetwork
+@using SocialNetwork.Models
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\_ViewStart.cshtml
+﻿@{
+    Layout = "_Layout";
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\CompleteProfile.cshtml
+﻿@model SocialNetwork.Models.ViewModels.UserProfileViewModel
+
+@{
+    ViewData["Title"] = "Complete Profile";
+}
+
+<h2>Complete Your Profile</h2>
+
+@if (ViewData.ModelState.ErrorCount > 0)
+{
+    <div class="alert alert-danger">
+        @foreach (var error in ViewData.ModelState.Values.SelectMany(v => v.Errors))
+        {
+            <p>@error.ErrorMessage</p>
+        }
+    </div>
+}
+
+<form asp-action="CompleteProfile" method="post">
+    <input type="hidden" asp-for="UserId" />
+    <div class="form-group">
+        <label asp-for="FullName"></label>
+        <input asp-for="FullName" class="form-control" />
+        <span asp-validation-for="FullName" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Gender"></label>
+        <select asp-for="Gender" class="form-control">
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+        </select>
+        <span asp-validation-for="Gender" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="DateOfBirth"></label>
+        <input asp-for="DateOfBirth" type="date" class="form-control" />
+        <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="ProfilePictureUrl"></label>
+        <input asp-for="ProfilePictureUrl" class="form-control" />
+        <span asp-validation-for="ProfilePictureUrl" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Complete Registration</button>
+</form>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\Login.cshtml
+﻿@model SocialNetwork.Models.ViewModels.LoginViewModel
+
+@{
+    ViewData["Title"] = "Login";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<h4>Use a local account to log in.</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Login">
+            <div class="form-group">
+                <label asp-for="Email" class="control-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Password" class="control-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <div class="checkbox">
+                    <label>
+                        <input asp-for="RememberMe" /> @Html.DisplayNameFor(model => model.RememberMe)
+                    </label>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">Log in</button>
+        </form>
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\Login.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Account
+{
+    public class LoginModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\Register.cshtml
+﻿@model SocialNetwork.Models.ViewModels.RegisterViewModel
+
+@{
+    ViewData["Title"] = "Register";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<h4>Create a new account.</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Register">
+            <div class="form-group">
+                <label asp-for="Username" class="control-label"></label>
+                <input asp-for="Username" class="form-control" />
+                <span asp-validation-for="Username" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Email" class="control-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Password" class="control-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ConfirmPassword" class="control-label"></label>
+                <input asp-for="ConfirmPassword" class="form-control" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Gender" class="control-label"></label>
+                <select asp-for="Gender" class="form-control" asp-items="Html.GetEnumSelectList<Gender>()"></select>
+                <span asp-validation-for="Gender" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DateOfBirth" class="control-label"></label>
+                <input asp-for="DateOfBirth" class="form-control" />
+                <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ProfilePictureUrl" class="control-label"></label>
+                <input asp-for="ProfilePictureUrl" class="form-control" />
+                <span asp-validation-for="ProfilePictureUrl" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\Register.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Account
+{
+    public class RegisterModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Account\RegisterAdmin.cshtml
+﻿@model SocialNetwork.Models.ViewModels.RegisterAdminViewModel
+
+@{
+    ViewData["Title"] = "Register User as Admin";
+}
+
+<h2>Register User</h2>
+
+<form asp-action="RegisterAdmin" method="post">
+    <div class="form-group">
+        <label asp-for="Username"></label>
+        <input asp-for="Username" class="form-control" />
+        <span asp-validation-for="Username" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Email"></label>
+        <input asp-for="Email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Password"></label>
+        <input asp-for="Password" type="password" class="form-control" />
+        <span asp-validation-for="Password" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="ConfirmPassword"></label>
+        <input asp-for="ConfirmPassword" type="password" class="form-control" />
+        <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Role"></label>
+        <select asp-for="Role" class="form-control">
+            <option value="RegularUser">Regular User</option>
+            <option value="Moderator">Moderator</option>
+        </select>
+        <span asp-validation-for="Role" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label>Password Requirements:</label>
+        <ul>
+            <li>At least 8 characters long</li>
+            <li>Contains an uppercase letter</li>
+            <li>Contains a lowercase letter</li>
+            <li>Contains a digit</li>
+            <li>Contains a special character</li>
+        </ul>
+    </div>
+    <button type="submit" class="btn btn-primary">Register</button>
+</form>
+
+<div>
+    <a asp-controller="Account" asp-action="Login">Already have an account? Login here.</a>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Create.cshtml
+﻿@model SocialNetwork.Models.ViewModels.ChatViewModel
+
+@{
+    ViewData["Title"] = "Create Chat";
+}
+
+<h2>Create Chat</h2>
+
+<h4>Chat</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div class="form-group">
+                <label asp-for="Name" class="control-label"></label>
+                <input asp-for="Name" class="form-control" />
+                <span asp-validation-for="Name" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Description" class="control-label"></label>
+                <input asp-for="Description" class="form-control" />
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Participants" class="control-label"></label>
+                <input asp-for="Participants" class="form-control" placeholder="Enter participant IDs separated by commas" />
+                <span asp-validation-for="Participants" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <input type="submit" value="Create" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Create.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Chat
+{
+    public class CreateModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Details.cshtml
+﻿@using System.Security.Claims
+@model SocialNetwork.Models.DTO.ChatDTO
+
+@{
+    ViewData["Title"] = "Chat Details";
+}
+
+<h2>@Model.Name</h2>
+<p>@Model.Description</p>
+
+<div>
+    <input type="hidden" id="chatId" value="@Model.Id" />
+    <input type="hidden" id="senderId" value="@User.FindFirstValue(System.Security.Claims.ClaimTypes.NameIdentifier)" />
+    <input type="text" id="messageInput" placeholder="Enter message" />
+    <button id="sendButton">Send</button>
+</div>
+
+<div id="messagesList">
+    @foreach (var message in Model.Messages)
+    {
+        <div>User @message.SenderId: @message.Content</div>
+    }
+</div>
+
+@section Scripts {
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+    <script src="~/js/chat.js"></script>
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Details.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Chat
+{
+    public class DetailsModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Index.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.ChatDTO>
+
+@{
+    ViewData["Title"] = "My Chats";
+}
+
+<h2>My Chats</h2>
+
+<p>
+    <a asp-action="Create">Create New Chat</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>
+                Name
+            </th>
+            <th>
+                Description
+            </th>
+            <th></th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var item in Model)
+        {
+            <tr>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Name)
+                </td>
+                <td>
+                    @Html.DisplayFor(modelItem => item.Description)
+                </td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@item.Id">Details</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Chat\Index.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Chat
+{
+    public class IndexModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\Index.cshtml
+﻿@model SocialNetwork.Models.ViewModels.FriendshipViewModel
+
+<div class="row">
+    <div class="col-md-4">
+        <input type="text" id="searchFriends" class="form-control mb-3" placeholder="Search Friends" />
+        <ul class="list-group friends-list">
+            @foreach (var friend in Model.Friends)
+            {
+                <li class="list-group-item friend-link" data-id="@friend.UserId">
+                    <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @friend.FullName
+                </li>
+            }
+        </ul>
+        <input type="text" id="searchAllUsers" class="form-control my-3" placeholder="Search All Users" />
+        <ul class="list-group all-users-list">
+            @foreach (var user in Model.AllUsers)
+            {
+                <li class="list-group-item user-link" data-id="@user.UserId">
+                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @user.FullName
+                </li>
+            }
+        </ul>
+        <h4>Incoming Friend Requests</h4>
+        <ul class="list-group incoming-requests-list">
+            @foreach (var request in Model.IncomingRequests)
+            {
+                <li class="list-group-item request-link" data-id="@request.UserId">
+                    <img src="@request.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @request.FullName
+                    <button id="acceptRequest" class="btn btn-success btn-sm" data-id="@request.UserId">Accept</button>
+                    <button id="declineRequest" class="btn btn-danger btn-sm" data-id="@request.UserId">Decline</button>
+                </li>
+            }
+        </ul>
+    </div>
+    <div class="col-md-8" id="userDetails">
+        <!-- User details will be loaded here -->
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\_AllUsers.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+<div class="list-group">
+    @foreach (var user in Model)
+    {
+        <a href="#" class="list-group-item list-group-item-action user-link" data-id="@user.UserId">
+            <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" width="30" height="30">
+            @user.FullName
+        </a>
+    }
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\_FriendsList.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+<div class="list-group">
+    @foreach (var friend in Model)
+    {
+        <a href="#" class="list-group-item list-group-item-action friend-link" data-id="@friend.UserId">
+            <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" width="30" height="30">
+            @friend.FullName
+        </a>
+    }
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\_FriendsList.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Friendship
+{
+    public class _FriendsListModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\_UserDetails.cshtml
+﻿@model SocialNetwork.Models.ViewModels.FriendshipViewModel
+
+<div class="user-details">
+    <img src="@(string.IsNullOrEmpty(Model.SelectedUser.ProfilePictureUrl) ? "/images/default-avatar.png" : Model.SelectedUser.ProfilePictureUrl)" alt="User Avatar" class="avatar">
+    <h2>@Model.SelectedUser.FullName</h2>
+    <p>@Model.SelectedUser.Gender</p>
+    <p>@Model.SelectedUser.DateOfBirth.ToShortDateString()</p>
+    <p>@Model.SelectedUser.Role</p>
+
+    @if (Model.FriendshipStatus == FriendshipStatus.Pending)
+    {
+        <button class="btn btn-success" id="acceptRequest" data-id="@Model.SelectedUser.UserId">Accept</button>
+        <button class="btn btn-danger" id="declineRequest" data-id="@Model.SelectedUser.UserId">Decline</button>
+    }
+    else if (Model.FriendshipStatus == FriendshipStatus.Accepted)
+    {
+        <button class="btn btn-danger" id="removeFriend" data-id="@Model.SelectedUser.UserId">Remove</button>
+    }
+    else
+    {
+        <button class="btn btn-primary" id="sendRequest" data-id="@Model.SelectedUser.UserId">Add Friend</button>
+    }
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Friendship\_UserSearchResult.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+<div class="list-group">
+    @foreach (var user in Model)
+    {
+        <a href="#" class="list-group-item list-group-item-action user-link" data-id="@user.UserId">
+            <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" width="30" height="30">
+            @user.FullName
+        </a>
+    }
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Home\Index.cshtml
+﻿@{
+    ViewData["Title"] = "Kwuh";
+}
+
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">Welcome to Social Network</h1>
+</div>
+
+<div class="content">
+    <p>This is the main content area.</p>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Home\News.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.PostDTO>
+
+@{
+    ViewData["Title"] = "News";
+}
+
+<h2>Latest News</h2>
+
+@foreach (var post in Model)
+{
+    <div class="post">
+        <h3>@post.Content</h3>
+        <p><strong>Posted by:</strong> @post.UserId on @post.DatePosted.ToShortDateString()</p>
+        @if (!string.IsNullOrEmpty(post.ImageUrl))
+        {
+            <img src="@post.ImageUrl" alt="Post image" class="post-image" />
+        }
+    </div>
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Home\News.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Home
+{
+    public class NewsModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Home\Privacy.cshtml
+﻿@{
+    ViewData["Title"] = "Privacy Policy";
+}
+<h1>@ViewData["Title"]</h1>
+
+<p>Use this page to detail your site's privacy policy.</p>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Create.cshtml
+﻿@model SocialNetwork.Models.DTO.PostDTO
+
+@{
+    ViewData["Title"] = "Create Post";
+}
+
+<h2>Create Post</h2>
+
+<form asp-action="Create">
+    <div class="form-group">
+        <label asp-for="Content" class="control-label"></label>
+        <textarea asp-for="Content" class="form-control"></textarea>
+        <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Tags" class="control-label"></label>
+        <select asp-for="Tags" class="form-control" multiple>
+            <option value="Sport">Sport</option>
+            <option value="Game">Game</option>
+            <option value="Blog">Blog</option>
+            <option value="Studing">Studing</option>
+            <option value="Music">Music</option>
+        </select>
+        <span asp-validation-for="Tags" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <input type="submit" value="Create" class="btn btn-primary" />
+    </div>
+</form>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Create.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Post
+{
+    public class CreateModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Details.cshtml
+﻿@model SocialNetwork.Models.DTO.PostDTO
+
+@{
+    ViewData["Title"] = "Post Details";
+}
+
+<h2>Post Details</h2>
+
+<div>
+    <h4>Post</h4>
+    <hr />
+    <dl class="row">
+        <dt class="col-sm-2">
+            Author
+        </dt>
+        <dd class="col-sm-10">
+            @Model.UserId
+        </dd>
+        <dt class="col-sm-2">
+            Content
+        </dt>
+        <dd class="col-sm-10">
+            @Model.Content
+        </dd>
+        <dt class="col-sm-2">
+            Date Posted
+        </dt>
+        <dd class="col-sm-10">
+            @Model.DatePosted
+        </dd>
+        <dt class="col-sm-2">
+            Tags
+        </dt>
+        <dd class="col-sm-10">
+            @foreach (var tag in Model.Tags)
+            {
+                <span class="badge badge-primary">@tag</span>
+            }
+        </dd>
+    </dl>
+</div>
+
+<div>
+    <h4>Comments</h4>
+    <hr />
+    @foreach (var comment in Model.Comments)
+    {
+        <div class="comment">
+            <p><strong>@comment.UserId:</strong> @comment.Content</p>
+            <p><small>@comment.DatePosted</small></p>
+            <form asp-action="DeleteComment" method="post">
+                <input type="hidden" name="commentId" value="@comment.Id" />
+                <input type="hidden" name="postId" value="@Model.Id" />
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    }
+</div>
+
+<div>
+    <h4>Add Comment</h4>
+    <form asp-action="AddComment" method="post">
+        <input type="hidden" name="PostId" value="@Model.Id" />
+        <div class="form-group">
+            <label asp-for="Content" class="control-label"></label>
+            <textarea asp-for="Content" name="Content" class="form-control"></textarea>
+            <span asp-validation-for="Content" class="text-danger"></span>
+        </div>
+        <div class="form-group">
+            <input type="submit" value="Add Comment" class="btn btn-primary" />
+        </div>
+    </form>
+</div>
+
+<p>
+    <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+</p>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Details.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Post
+{
+    public class DetailsModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Edit.cshtml
+﻿@model SocialNetwork.Models.DTO.PostDTO
+
+@{
+    ViewData["Title"] = "Edit Post";
+}
+
+<h2>Edit Post</h2>
+
+<form asp-action="Edit">
+    <input type="hidden" asp-for="Id" />
+    <div class="form-group">
+        <label asp-for="Content" class="control-label"></label>
+        <textarea asp-for="Content" class="form-control"></textarea>
+        <span asp-validation-for="Content" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Tags" class="control-label"></label>
+        <select asp-for="Tags" class="form-control" multiple>
+            <option value="Sport">Sport</option>
+            <option value="Game">Game</option>
+            <option value="Blog">Blog</option>
+            <option value="Studing">Studing</option>
+            <option value="Music">Music</option>
+        </select>
+        <span asp-validation-for="Tags" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <input type="submit" value="Save" class="btn btn-primary" />
+    </div>
+</form>
+
+<div>
+    <a asp-action="Index">Back to List</a>
+</div>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Edit.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Post
+{
+    public class EditModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Index.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.PostDTO>
+
+@{
+    ViewData["Title"] = "News Feed";
+}
+
+<h2>News Feed</h2>
+
+<p>
+    <a asp-action="Create" class="btn btn-primary">Create New Post</a>
+</p>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>Author</th>
+            <th>Content</th>
+            <th>Date Posted</th>
+            <th>Tags</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var post in Model)
+        {
+            <tr>
+                <td>@post.UserId</td>
+                <td>@post.Content</td>
+                <td>@post.DatePosted</td>
+                <td>
+                    @foreach (var tag in post.Tags)
+                    {
+                        <span class="badge badge-primary">@tag</span>
+                    }
+                </td>
+                <td>
+                    <a asp-action="Details" asp-route-id="@post.Id" class="btn btn-info">Details</a>
+                    <a asp-action="Edit" asp-route-id="@post.Id" class="btn btn-warning">Edit</a>
+                    <a asp-action="Delete" asp-route-id="@post.Id" class="btn btn-danger">Delete</a>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Post\Index.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Post
+{
+    public class IndexModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Profile\EditProfile.cshtml
+﻿@model SocialNetwork.Models.ViewModels.EditProfileViewModel
+
+@{
+    ViewData["Title"] = "Edit Profile";
+}
+
+<h2>Edit Profile</h2>
+
+<form asp-action="EditProfile" method="post">
+    <div class="form-group">
+        <label asp-for="FullName" class="control-label"></label>
+        <input asp-for="FullName" class="form-control" />
+        <span asp-validation-for="FullName" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="DateOfBirth" class="control-label"></label>
+        <input asp-for="DateOfBirth" class="form-control" />
+        <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="ProfilePictureUrl" class="control-label"></label>
+        <input asp-for="ProfilePictureUrl" class="form-control" />
+        <span asp-validation-for="ProfilePictureUrl" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Gender" class="control-label"></label>
+        <select asp-for="Gender" class="form-control">
+            <option value="0">Male</option>
+            <option value="1">Female</option>
+        </select>
+        <span asp-validation-for="Gender" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <input type="submit" value="Save" class="btn btn-primary" />
+    </div>
+</form>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Profile\EditProfile.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace SocialNetwork.Views.Profile
+{
+    public class EditModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Profile\Index.cshtml
+﻿@model SocialNetwork.Models.ViewModels.UserProfileViewModel
+
+@{
+    ViewData["Title"] = "Profile";
+    var avatar = Model.ProfilePictureUrl ?? "~/images/default-avatar.png";
+}
+
+<div class="profile-container">
+    <div class="profile-avatar-container">
+        <img src="@avatar" alt="Avatar" class="profile-avatar">
+        <h2>@Model.FullName</h2>
+        @if (User.Identity.Name == Model.FullName) // Или используйте подходящее поле для проверки текущего пользователя
+        {
+            <a class="btn btn-primary" href="@Url.Action("EditProfile", new { userId = Model.UserId })">Edit</a>
+        }
+    </div>
+    <div class="profile-details">
+        <h3>Details</h3>
+        <p>@Model.DateOfBirth.ToString("d")</p>
+        <p>@Model.Gender</p>
+        <p>@Model.Role</p>
+    </div>
+</div>
+
+<div class="posts-container">
+    <h3>Posts</h3>
+    <div id="posts-container">
+        @foreach (var post in Model.Posts)
+        {
+            @Html.Partial("_Post", post)
+        }
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Shared\Error.cshtml
+﻿@model SocialNetwork.Models.ViewModels.ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+}
+
+<h1 class="text-danger">Error.</h1>
+<h2 class="text-danger">An error occurred while processing your request.</h2>
+
+@if (Model.ShowRequestId)
+{
+    <p>
+        <strong>Request ID:</strong> <code>@Model.RequestId</code>
+    </p>
+}
+
+<h3>Development Mode</h3>
+<p>
+    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
+</p>
+<p>
+    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
+    It can result in displaying sensitive information from exceptions to end users.
+    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
+    and restarting the app.
+</p>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Shared\_Layout.cshtml
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - Social Network</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" />
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js"></script>
+</head>
+<body>
+    <div class="navbar">
+        <a class="nav-link" href="/Home/Index">
+            <i class="fas fa-home"></i> Home
+        </a>
+        <a class="nav-link" href="/Profile/Index">
+            <i class="fas fa-user"></i> Profile
+        </a>
+        <a class="nav-link" href="/News/Index">
+            <i class="fas fa-newspaper"></i> News
+        </a>
+        <a class="nav-link" href="/Friendship/Index">
+            <i class="fas fa-users"></i> Friends
+        </a>
+        <a class="nav-link" href="/Chat/Index">
+            <i class="fas fa-comments"></i> Chat
+        </a>
+        @if (User.IsInRole("Administrator") || User.IsInRole("Moderator"))
+        {
+            <a class="nav-link" asp-area="" asp-controller="Users" asp-action="Index">
+                <i class="fa fa-cog"></i> Users
+            </a>
+        }
+        <a class="nav-link logout" href="/Account/Logout">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </a>
+    </div>
+    <div class="main-content">
+        @RenderBody()
+    </div>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Shared\_Layout.cshtml.css
+﻿/* Please see documentation at https://learn.microsoft.com/aspnet/core/client-side/bundling-and-minification
+for details on configuring this project to bundle and minify static web assets. */
+
+a.navbar-brand {
+  white-space: normal;
+  text-align: center;
+  word-break: break-all;
+}
+
+a {
+  color: #0077cc;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.nav-pills .nav-link.active, .nav-pills .show > .nav-link {
+  color: #fff;
+  background-color: #1b6ec2;
+  border-color: #1861ac;
+}
+
+.border-top {
+  border-top: 1px solid #e5e5e5;
+}
+.border-bottom {
+  border-bottom: 1px solid #e5e5e5;
+}
+
+.box-shadow {
+  box-shadow: 0 .25rem .75rem rgba(0, 0, 0, .05);
+}
+
+button.accept-policy {
+  font-size: 1rem;
+  line-height: inherit;
+}
+
+.footer {
+  position: absolute;
+  bottom: 0;
+  width: 100%;
+  white-space: nowrap;
+  line-height: 60px;
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Shared\_Post.cshtml
+﻿@model SocialNetwork.Models.DTO.PostDTO
+
+<div class="post mb-4">
+    <div class="post-header d-flex align-items-center">
+        <img src="@Model.AuthorProfile.ProfilePictureUrl ?? " ~ /images/default-avatar.png"" alt="Avatar" class="post-avatar">
+        <div>
+            <h5 class="m-0">@Model.AuthorProfile.FullName</h5>
+            <small>@Model.DatePosted.ToString("g")</small>
+        </div>
+    </div>
+    <div class="post-content mt-2">
+        <p>@Model.Content</p>
+        @if (!string.IsNullOrEmpty(Model.ImageUrl))
+        {
+            <img src="@Model.ImageUrl" alt="Post Image" class="post-image">
+        }
+    </div>
+    <div class="post-footer d-flex justify-content-between mt-2">
+        <div>
+            <i class="far fa-thumbs-up"></i> @Model.LikesCount
+        </div>
+        <div>
+            <a href="@Url.Action("EditPost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link">Edit</a>
+            <a href="@Url.Action("DeletePost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link text-danger">Delete</a>
+        </div>
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Shared\_ValidationScriptsPartial.cshtml
+﻿<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+<script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+<environment include="Development">
+    <script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+    <script src="~/lib/jquery-validation-unobtrusive/jquery.validate.unobtrusive.min.js"></script>
+</environment>
+<environment exclude="Development">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js" integrity="sha384-JCZwtPykjrMcyTwX25svG6Ogq0E/dyZoc2bU5fKkD2UoC5+F94/hXpS3BuGoKEiD" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validation-unobtrusive/3.2.12/jquery.validate.unobtrusive.min.js" integrity="sha384-0BY7d7Ll49ukxts3p4kWjvStzUL9NxZ3k99z5MAh1QjXhzu+U+9gD+esNzzy+E3I" crossorigin="anonymous"></script>
+</environment>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Users\Create.cshtml
+﻿@model SocialNetwork.Models.ViewModels.RegisterViewModel
+
+@{
+    ViewData["Title"] = "Create User";
+}
+
+<h2>@ViewData["Title"]</h2>
+
+<h4>Create a new account.</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Create">
+            <div class="form-group">
+                <label asp-for="Username" class="control-label"></label>
+                <input asp-for="Username" class="form-control" />
+                <span asp-validation-for="Username" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Email" class="control-label"></label>
+                <input asp-for="Email" class="form-control" />
+                <span asp-validation-for="Email" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Password" class="control-label"></label>
+                <input asp-for="Password" class="form-control" />
+                <span asp-validation-for="Password" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ConfirmPassword" class="control-label"></label>
+                <input asp-for="ConfirmPassword" class="form-control" />
+                <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Gender" class="control-label"></label>
+                <select asp-for="Gender" class="form-control" asp-items="Html.GetEnumSelectList<Gender>()"></select>
+                <span asp-validation-for="Gender" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="DateOfBirth" class="control-label"></label>
+                <input asp-for="DateOfBirth" class="form-control" />
+                <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="ProfilePictureUrl" class="control-label"></label>
+                <input asp-for="ProfilePictureUrl" class="form-control" />
+                <span asp-validation-for="ProfilePictureUrl" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Description" class="control-label"></label>
+                <input asp-for="Description" class="form-control" />
+                <span asp-validation-for="Description" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="FullName" class="control-label"></label>
+                <input asp-for="FullName" class="form-control" />
+                <span asp-validation-for="FullName" class="text-danger"></span>
+            </div>
+            <div class="form-group">
+                <label asp-for="Role" class="control-label"></label>
+                <select asp-for="Role" class="form-control" asp-items="Html.GetEnumSelectList<Role>()"></select>
+                <span asp-validation-for="Role" class="text-danger"></span>
+            </div>
+            <button type="submit" class="btn btn-primary">Register</button>
+        </form>
+    </div>
+</div>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Users\Edit.cshtml
+﻿@model SocialNetwork.Models.ViewModels.EditProfileViewModel
+
+@{
+    ViewData["Title"] = "Edit User";
+}
+
+<h1>Edit User</h1>
+
+<form asp-action="Edit" method="post">
+    <input type="hidden" asp-for="Id" />
+    <div class="form-group">
+        <label asp-for="Username" class="control-label"></label>
+        <input asp-for="Username" class="form-control" />
+        <span asp-validation-for="Username" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Email" class="control-label"></label>
+        <input asp-for="Email" class="form-control" />
+        <span asp-validation-for="Email" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Gender" class="control-label"></label>
+        <select asp-for="Gender" class="form-control" asp-items="Html.GetEnumSelectList<Gender>()"></select>
+        <span asp-validation-for="Gender" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="AvatarUrl" class="control-label"></label>
+        <input asp-for="AvatarUrl" class="form-control" />
+        <span asp-validation-for="AvatarUrl" class="text-danger"></span>
+    </div>
+    <div class="form-group">
+        <label asp-for="Description" class="control-label"></label>
+        <textarea asp-for="Description" class="form-control"></textarea>
+        <span asp-validation-for="Description" class="text-danger"></span>
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Users\Edit.cshtml.cs
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+
+namespace WebForum.Views.Users
+{
+    public class EditProfileModel : PageModel
+    {
+        public void OnGet()
+        {
+        }
+    }
+}
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\Views\Users\Index.cshtml
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+@{
+    ViewData["Title"] = "Users";
+}
+
+<h1>Users</h1>
+
+@if (User.IsInRole("Administrator"))
+{
+    <a asp-action="Create" class="btn btn-primary">Create User</a>
+}
+
+<form asp-action="Index" method="get">
+    <input type="text" name="search" placeholder="Search users..." />
+    <button type="submit">Search</button>
+</form>
+
+<table class="table">
+    <thead>
+        <tr>
+            <th>FullName</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var user in Model)
+        {
+            <tr>
+                <td>@user.FullName</td>
+                <td>@user.Email</td>
+                <td>@user.Role</td>
+                <td>
+                    <a class="btn btn-info" asp-action="Edit" asp-route-id="@user.UserId">Edit</a>
+                    @if (User.IsInRole("Administrator"))
+                    {
+                        <form asp-action="ChangeRole" method="post" class="d-inline">
+                            <input type="hidden" name="id" value="@user.UserId" />
+                            <select name="role" class="form-control d-inline w-auto">
+                                @{
+                                    var isRegularUserSelected = user.Role == Role.RegularUser ? "selected" : "";
+                                    var isModeratorSelected = user.Role == Role.Moderator ? "selected" : "";
+                                }
+                                <option value="RegularUser" selected=@isRegularUserSelected>Regular User</option>
+                                <option value="Moderator" selected=@isModeratorSelected>Moderator</option>
+                            </select>
+                            <button type="submit" class="btn btn-primary">Change Role</button>
+                        </form>
+                    }
+                    <form asp-action="BanUser" method="post" class="d-inline">
+                        <input type="hidden" name="id" value="@user.UserId" />
+                        <button type="submit" class="btn btn-danger">Ban</button>
+                    </form>
+                    @if (user.IsBanned)
+                    {
+                        <form asp-action="UnbanUser" method="post" class="d-inline">
+                            <input type="hidden" name="id" value="@user.UserId" />
+                            <button type="submit" class="btn btn-success">Unban</button>
+                        </form>
+                    }
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+
+C:\Users\kotsg\source\repos\Reggit76\SocialNetwork\SocialNetwork\wwwroot\css\site.css

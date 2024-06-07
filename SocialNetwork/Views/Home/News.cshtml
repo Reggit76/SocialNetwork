@@ -1,0 +1,19 @@
+﻿@model IEnumerable<SocialNetwork.Models.DTO.PostDTO>
+
+@{
+    ViewData["Title"] = "News";
+}
+
+<h2>Latest News</h2>
+
+@foreach (var post in Model)
+{
+    <div class="post">
+        <h3>@post.Content</h3>
+        <p><strong>Posted by:</strong> @post.UserId on @post.DatePosted.ToShortDateString()</p>
+        @if (!string.IsNullOrEmpty(post.ImageUrl))
+        {
+            <img src="@post.ImageUrl" alt="Post image" class="post-image" />
+        }
+    </div>
+}

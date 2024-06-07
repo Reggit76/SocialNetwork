@@ -6,6 +6,6 @@
         public string Name { get; set; } = null!;
         public string Description { get; set; } = null!;
         public List<MessageDTO> Messages { get; set; } = new List<MessageDTO>();
-        public List<UserProfileDTO> Participants { get; set; } = new List<UserProfileDTO>();
+        public List<UserDTO> Participants { get; set; } = new List<UserDTO>();
     }
 }

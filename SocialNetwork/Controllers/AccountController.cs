@@ -3,9 +3,9 @@ using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using NuGet.Protocol;
-using SocialNetwork.Models.AccountViewModels;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services;
 using SocialNetwork.Services.Interfaces;
 using System.Collections.Generic;
@@ -51,21 +51,15 @@ namespace SocialNetwork.Controllers
 
         private async Task AuthenticateUserAsync(UserDTO user)
         {
-            var role = _userService.GetUserRole(user.Id);
             var claims = new List<Claim>
             {
                 new Claim(ClaimTypes.Name, user.Username),
-                new Claim(ClaimTypes.Role, role.ToString())
+                new Claim("UserId", user.Id.ToString())
             };
 
-            var claimsIdentity = new ClaimsIdentity(claims, "MyCookieAuthenticationScheme");
-            var authProperties = new AuthenticationProperties
-            {
-                IsPersistent = true
-            };
+            var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
 
-            await HttpContext.SignInAsync("MyCookieAuthenticationScheme",
-                new ClaimsPrincipal(claimsIdentity), authProperties);
+            await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity));
         }
 
         [HttpGet]
@@ -82,10 +76,24 @@ namespace SocialNetwork.Controllers
                 var user = _userService.AuthenticateUser(model.Username, model.Password);
                 if (user != null)
                 {
-                    await AuthenticateUserAsync(user);
+                    var claims = new List<Claim>
+                    {
+                        new Claim(ClaimTypes.Name, user.Username),
+                        new Claim("UserId", user.Id.ToString())
+                    };
+
+                    var claimsIdentity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+
+                    var authProperties = new AuthenticationProperties
+                    {
+                        IsPersistent = model.RememberMe, // Использование свойства RememberMe
+                    };
+
+                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
+
                     return RedirectToAction("Index", "Home");
                 }
-                ModelState.AddModelError("", "Login failed");
+                ModelState.AddModelError(string.Empty, "Invalid login attempt.");
             }
             return View(model);
         }
@@ -94,8 +102,8 @@ namespace SocialNetwork.Controllers
         [Authorize]
         public async Task<IActionResult> Logout()
         {
-            await HttpContext.SignOutAsync("MyCookieAuthenticationScheme");
-            return RedirectToAction("Login");
+            await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            return RedirectToAction("Login", "Account");
         }
 
         [HttpGet]
@@ -148,21 +156,20 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                var userProfile = new UserProfileDTO
+                var User = new UserDTO
                 {
                     UserId = model.UserId,
                     FullName = model.FullName,
                     Gender = model.Gender,
-                    DateOfBirth = model.DateOfBirth, 
+                    DateOfBirth = model.DateOfBirth,
                     ProfilePictureUrl = model.ProfilePictureUrl
                 };
-                if (_userService.UpdateUserProfile(userProfile))
-                {
-                    return RedirectToAction("Index", "Home");
-                }
-                ModelState.AddModelError("", "Failed to complete profile");
+                _userService.UpdateUserProfile(User);
+                return RedirectToAction("Index", "Home");
             }
+            ModelState.AddModelError("", "Failed to complete profile");
             return View(model);
         }
+
     }
 }

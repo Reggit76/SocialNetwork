@@ -1,6 +1,5 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services.Interfaces;
 
@@ -18,77 +17,76 @@ namespace SocialNetwork.Controllers
             _userService = userService;
         }
 
-        public IActionResult Index(string searchTerm = null, string tab = "Friends")
+        public IActionResult Index()
         {
             var userId = _userService.GetUserId(User.Identity.Name);
             var friends = _friendshipService.GetFriends(userId);
-            var allUsers = _userService.SearchUsers(searchTerm);
-            var incomingRequests = _friendshipService.GetIncomingFriendRequests(userId); // Получение входящих запросов
+            var allUsers = _userService.GetAllUsers();
+            var incomingRequests = _friendshipService.GetPendingRequests(userId);
 
             var model = new FriendshipViewModel
             {
                 Friends = friends,
                 AllUsers = allUsers,
-                IncomingRequests = incomingRequests, // Добавлено в модель
-                SearchTerm = searchTerm,
-                SelectedTab = tab
+                IncomingRequests = incomingRequests,
+                SelectedTab = "Friends"
             };
 
             return View(model);
         }
 
-        public IActionResult UserDetails(int userId, string tab = "Friends")
+        public IActionResult AllUsers()
         {
-            var currentUserId = _userService.GetUserId(User.Identity.Name);
-            var user = _userService.GetUserProfile(userId);
+            var allUsers = _userService.GetAllUsers();
+            return PartialView("_AllUsers", allUsers);
+        }
 
-            var friends = _friendshipService.GetFriends(currentUserId);
-            var allUsers = _userService.SearchUsers(null);
-            var incomingRequests = _friendshipService.GetIncomingFriendRequests(currentUserId); // Получение входящих запросов
+        [HttpPost]
+        public IActionResult SendRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.SendFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult AcceptRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.AcceptFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult DeclineRequest(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.DeclineFriendRequest(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpPost]
+        public IActionResult RemoveFriend(int id)
+        {
+            var userId = _userService.GetUserId(User.Identity.Name);
+            _friendshipService.RemoveFriend(userId, id);
+            return RedirectToAction("Index");
+        }
+
+        [HttpGet]
+        public IActionResult GetUserDetails(int id)
+        {
+            var user = _userService.GetUserProfile(id);
+            var userId = _userService.GetUserId(User.Identity.Name);
+            var friendshipStatus = _friendshipService.GetFriendshipStatus(userId, id);
 
             var model = new FriendshipViewModel
             {
-                Friends = friends,
-                AllUsers = allUsers,
-                IncomingRequests = incomingRequests, // Добавлено в модель
                 SelectedUser = user,
-                IsFriend = _friendshipService.IsFriend(currentUserId, userId),
-                HasPendingRequest = _friendshipService.HasPendingRequest(currentUserId, userId),
-                SelectedTab = tab
+                FriendshipStatus = friendshipStatus
             };
 
-            return View("Index", model);
-        }
-
-        [HttpPost]
-        public IActionResult SendFriendRequest(int friendId)
-        {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.SendFriendRequest(userId, friendId);
-            return RedirectToAction("UserDetails", new { userId = friendId });
-        }
-
-        [HttpPost]
-        public IActionResult AcceptFriendRequest(int friendId)
-        {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.AcceptFriendRequest(userId, friendId);
-            return RedirectToAction("UserDetails", new { userId = friendId });
-        }
-
-        [HttpPost]
-        public IActionResult RemoveFriend(int friendId)
-        {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.RemoveFriend(userId, friendId);
-            return RedirectToAction("UserDetails", new { userId = friendId });
-        }
-
-        public IActionResult PendingRequests()
-        {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            var pendingRequests = _friendshipService.GetPendingRequests(userId);
-            return View(pendingRequests);
+            return PartialView("_UserDetails", model);
         }
     }
 }

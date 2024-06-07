@@ -1,32 +1,25 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using SocialNetwork.Models.Entity;
-using System.Configuration;
 
 namespace SocialNetwork.Data
 {
-    public class UserDbContext : DbContext
+    public class ApplicationDbContext : DbContext
     {
         public DbSet<User> Users { get; set; }
-        public DbSet<UserProfile> UserProfiles { get; set; }
         public DbSet<Friendship> Friendships { get; set; }
         public DbSet<Post> Posts { get; set; }
         public DbSet<Comment> Comments { get; set; }
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<ChatUser> ChatUsers { get; set; }
+        public DbSet<PostTag> PostTags { get; set; }
 
-        public UserDbContext(DbContextOptions<UserDbContext> options) : base(options)
+        public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
             // Включение ленивой загрузки
             this.ChangeTracker.LazyLoadingEnabled = true;
         }
-
-        //protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-        //{
-        //    optionsBuilder.UseNpgsql(Configuration.GetConnectionString("DefaultConnection"))
-        //                  .UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery)
-        //                  .ConfigureWarnings(w => w.Throw(RelationalEventId.MultipleCollectionIncludeWarning));
-        //}
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
@@ -58,25 +51,15 @@ namespace SocialNetwork.Data
                 .Property<string>("PasswordHash");
 
             modelBuilder.Entity<User>()
-                .HasOne(u => u.UserProfile)
-                .WithOne(up => up.User)
-                .HasForeignKey<UserProfile>(up => up.UserId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // UserProfile entity configuration
-            modelBuilder.Entity<UserProfile>()
-                .HasKey(up => up.UserId);
-
-            modelBuilder.Entity<UserProfile>()
-                .Property(up => up.FullName)
+                .Property(u => u.FullName)
                 .HasMaxLength(100);
 
-            modelBuilder.Entity<UserProfile>()
-                .Property(up => up.ProfilePictureUrl)
+            modelBuilder.Entity<User>()
+                .Property(u => u.ProfilePictureUrl)
                 .HasMaxLength(255);
 
-            modelBuilder.Entity<UserProfile>()
-                .Property(up => up.DateOfBirth)
+            modelBuilder.Entity<User>()
+                .Property(u => u.DateOfBirth)
                 .HasColumnType("date");
 
             // Post entity configuration
@@ -92,12 +75,12 @@ namespace SocialNetwork.Data
                 .IsRequired();
 
             modelBuilder.Entity<Post>()
-                .HasOne(p => p.User)
+                .HasOne(p => p.Author)
                 .WithMany()
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
 
-            // PostTag entity configyration
+            // PostTag entity configuration
             modelBuilder.Entity<PostTag>()
                 .HasKey(pt => new { pt.PostId, pt.Tag });
 
@@ -199,7 +182,7 @@ namespace SocialNetwork.Data
                 .OnDelete(DeleteBehavior.Cascade);
 
             modelBuilder.Entity<ChatUser>()
-                .HasOne(cu => cu.UserProfile)
+                .HasOne(cu => cu.User)
                 .WithMany(up => up.Chats)
                 .HasForeignKey(cu => cu.UserId)
                 .OnDelete(DeleteBehavior.Cascade);

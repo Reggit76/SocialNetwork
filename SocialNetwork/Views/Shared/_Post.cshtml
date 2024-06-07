@@ -1,0 +1,27 @@
+﻿@model SocialNetwork.Models.DTO.PostDTO
+
+<div class="post mb-4">
+    <div class="post-header d-flex align-items-center">
+        <img src="@Model.AuthorProfile.ProfilePictureUrl ?? " ~ /images/default-avatar.png"" alt="Avatar" class="post-avatar">
+        <div>
+            <h5 class="m-0">@Model.AuthorProfile.FullName</h5>
+            <small>@Model.DatePosted.ToString("g")</small>
+        </div>
+    </div>
+    <div class="post-content mt-2">
+        <p>@Model.Content</p>
+        @if (!string.IsNullOrEmpty(Model.ImageUrl))
+        {
+            <img src="@Model.ImageUrl" alt="Post Image" class="post-image">
+        }
+    </div>
+    <div class="post-footer d-flex justify-content-between mt-2">
+        <div>
+            <i class="far fa-thumbs-up"></i> @Model.LikesCount
+        </div>
+        <div>
+            <a href="@Url.Action("EditPost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link">Edit</a>
+            <a href="@Url.Action("DeletePost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link text-danger">Delete</a>
+        </div>
+    </div>
+</div>

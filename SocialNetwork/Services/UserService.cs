@@ -4,73 +4,65 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
 using SocialNetwork.Models;
 using SocialNetwork.Services.Interfaces;
+using SocialNetwork.Models.ViewModels;
 
 namespace SocialNetwork.Services
 {
     public class UserService : IUserService
     {
-        private readonly UserDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public UserService(UserDbContext context)
+        public UserService(ApplicationDbContext context)
         {
             _context = context;
         }
 
-        public int GetUserId(string username)
+        public async Task<int> GetUserIdAsync(string Username)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Username == username);
-            if (user == null)
-            {
-                throw new ArgumentException("User not found.");
-            }
-            return user.Id;
+            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == Username);
+            return user?.Id ?? 0;
         }
 
-        public bool RegisterUser(string username, string email, string password)
+        public async Task<bool> RegisterUserAsync(RegisterViewModel model)
         {
-            if (_context.Users.Any(u => u.Username == username || u.Email == email))
+            if (await _context.Users.AnyAsync(u => u.Username == model.Username || u.Email == model.Email))
             {
                 return false;
             }
 
-            if (!IsValidPassword(password))
+            if (!IsValidPassword(model.Password))
             {
                 throw new ArgumentException("Password does not meet the required criteria.");
             }
 
             var user = new User
             {
-                Username = username,
-                Email = email,
+                Username = model.Username,
+                Email = model.Email,
+                FullName = model.FullName,
+                Gender = model.Gender,
+                DateOfBirth = model.DateOfBirth,
+                ProfilePictureUrl = model.ProfilePictureUrl,
+                Role = model.Role
             };
 
-            _context.Users.Add(user);
-            _context.SaveChanges();
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
 
-            // Создание профиля пользователя с начальным значением FullName
-            var userProfile = new UserProfile
-            {
-                UserId = user.Id,
-                FullName = "", // Инициализация пустым значением, чтобы удовлетворить ограничение NOT NULL
-                Role = UserRole.RegularUser
-            };
-            _context.UserProfiles.Add(userProfile);
-            _context.SaveChanges();
-
-            // Сохранить хэш пароля отдельно в таблице Users
-            var passwordHash = HashPassword(password);
+            var passwordHash = HashPassword(model.Password);
             SavePasswordHash(user.Id, passwordHash);
 
             return true;
         }
 
-        public bool RegisterUserAsAdmin(string username, string email, string password, UserRole role)
+        public bool RegisterUserAsAdmin(string username, string email, string password, Role role, string fullName, Gender gender, DateTime dateOfBirth, string? profilePictureUrl, string? description)
         {
             if (_context.Users.Any(u => u.Username == username || u.Email == email))
             {
@@ -86,59 +78,60 @@ namespace SocialNetwork.Services
             {
                 Username = username,
                 Email = email,
-            };
-
-            _context.Users.Add(user);
-            _context.SaveChanges();
-
-            // Создание профиля пользователя с указанной ролью и начальным значением FullName
-            var userProfile = new UserProfile
-            {
-                UserId = user.Id,
-                FullName = "", // Инициализация пустым значением, чтобы удовлетворить ограничение NOT NULL
+                FullName = fullName,
+                Gender = gender,
+                DateOfBirth = dateOfBirth,
+                ProfilePictureUrl = profilePictureUrl,
+                Description = description,
                 Role = role
             };
-            _context.UserProfiles.Add(userProfile);
+
+            _context.Users.Add(user);
             _context.SaveChanges();
 
-            // Сохранить хэш пароля отдельно в таблице Users
             var passwordHash = HashPassword(password);
             SavePasswordHash(user.Id, passwordHash);
 
             return true;
         }
 
-        public List<UserProfileDTO> SearchUsers(string searchTerm)
+        public async Task<List<UserDTO>> SearchUsersAsync(string searchTerm)
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
             {
-                return _context.UserProfiles
-                    .Select(u => new UserProfileDTO
+                return await _context.Users
+                    .Select(u => new UserDTO
                     {
-                        UserId = u.UserId,
+                        UserId = u.Id,
                         FullName = u.FullName,
+                        Email = u.Email,
                         Gender = u.Gender,
                         DateOfBirth = u.DateOfBirth,
                         ProfilePictureUrl = u.ProfilePictureUrl,
-                        Role = u.Role
-                    }).ToList();
+                        Role = u.Role,
+                        Username = u.Username,
+                        IsBanned = u.IsBanned
+                    }).ToListAsync();
             }
-            return _context.UserProfiles
-                .Where(u => u.FullName.Contains(searchTerm) || u.User.Username.Contains(searchTerm))
-                .Select(u => new UserProfileDTO
+            return await _context.Users
+                .Where(u => u.FullName.Contains(searchTerm) || u.Username.Contains(searchTerm))
+                .Select(u => new UserDTO
                 {
-                    UserId = u.UserId,
+                    UserId = u.Id,
                     FullName = u.FullName,
+                    Email = u.Email,
                     Gender = u.Gender,
                     DateOfBirth = u.DateOfBirth,
                     ProfilePictureUrl = u.ProfilePictureUrl,
-                    Role = u.Role
-                }).ToList();
+                    Role = u.Role,
+                    Username = u.Username,
+                    IsBanned = u.IsBanned
+                }).ToListAsync();
         }
 
-        public UserDTO AuthenticateUser(string username, string password)
+        public async Task<UserDTO> AuthenticateUserAsync(string Username, string password)
         {
-            var user = _context.Users.FirstOrDefault(u => u.Username == username);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == Username);
             if (user != null)
             {
                 var storedPasswordHash = GetPasswordHash(user.Id);
@@ -146,9 +139,15 @@ namespace SocialNetwork.Services
                 {
                     return new UserDTO
                     {
-                        Id = user.Id,
+                        UserId = user.Id,
+                        FullName = user.FullName,
+                        Email = user.Email,
+                        Gender = user.Gender,
+                        DateOfBirth = user.DateOfBirth,
+                        ProfilePictureUrl = user.ProfilePictureUrl,
+                        Role = user.Role,
                         Username = user.Username,
-                        Email = user.Email
+                        IsBanned = user.IsBanned
                     };
                 }
             }
@@ -156,102 +155,168 @@ namespace SocialNetwork.Services
             return null;
         }
 
-        public UserProfileDTO GetUserProfile(int userId)
+        public async Task<UserDTO> GetUserProfileAsync(int userId)
         {
-            var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
-            if (profile != null)
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null) return null;
+
+            return new UserDTO
             {
-                return new UserProfileDTO
-                {
-                    UserId = profile.UserId,
-                    FullName = profile.FullName,
-                    Gender = profile.Gender,
-                    DateOfBirth = profile.DateOfBirth,
-                    ProfilePictureUrl = profile.ProfilePictureUrl,
-                    Role = profile.Role
-                };
-            }
-            return null;
+                UserId = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                Gender = user.Gender,
+                DateOfBirth = user.DateOfBirth,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Role = user.Role,
+                Username = user.Username,
+                IsBanned = user.IsBanned
+            };
         }
 
-        public bool UpdateUserProfile(UserProfileDTO profile)
+        public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
         {
-            var existingProfile = _context.UserProfiles.FirstOrDefault(p => p.UserId == profile.UserId);
-            if (existingProfile != null)
+            return await _context.Posts
+                .Where(p => p.UserId == userId)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl
+                }).ToListAsync();
+        }
+
+        public async Task<bool> UpdateUserProfileAsync(UserDTO User)
+        {
+            var user = await _context.Users.FindAsync(User.UserId);
+            if (user == null)
             {
-                existingProfile.FullName = profile.FullName;
-                existingProfile.Gender = profile.Gender;
-                existingProfile.DateOfBirth = profile.DateOfBirth;
-                existingProfile.ProfilePictureUrl = profile.ProfilePictureUrl;
-                existingProfile.Role = profile.Role;
-
-                _context.SaveChanges();
-                return true;
+                return false;
             }
 
-            return false;
+            user.FullName = User.FullName;
+            user.Gender = User.Gender;
+            user.DateOfBirth = User.DateOfBirth;
+            user.ProfilePictureUrl = User.ProfilePictureUrl;
+            user.Email = User.Email;
+            user.Username = User.Username;
+            user.IsBanned = User.IsBanned;
+
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
         }
 
-        public List<ChatDTO> GetUserChats(int userId)
+        public async Task<List<UserDTO>> GetAllUsersAsync()
         {
-            return _context.ChatUsers
-                .Where(cu => cu.UserId == userId)
-                .Include(cu => cu.Chat)
-                .ThenInclude(c => c.Messages)
-                .Include(cu => cu.Chat)
-                .ThenInclude(c => c.Participants)
-                .ThenInclude(cp => cp.UserProfile)
-                .Select(cu => new ChatDTO
-                {
-                    Id = cu.Chat.Id,
-                    Name = cu.Chat.Name,
-                    Description = cu.Chat.Description,
-                    Participants = cu.Chat.Participants.Select(p => new UserProfileDTO
-                    {
-                        UserId = p.UserProfile.UserId,
-                        FullName = p.UserProfile.FullName,
-                        Gender = p.UserProfile.Gender,
-                        DateOfBirth = p.UserProfile.DateOfBirth,
-                        ProfilePictureUrl = p.UserProfile.ProfilePictureUrl,
-                        Role = p.UserProfile.Role
-                    }).ToList(),
-                    Messages = cu.Chat.Messages.Select(m => new MessageDTO
-                    {
-                        Id = m.Id,
-                        SenderId = m.SenderId,
-                        ChatId = m.ChatId,
-                        Content = m.Content,
-                        Timestamp = m.Timestamp
-                    }).ToList()
-                }).ToList();
-        }
-
-        public UserRole GetUserRole(int userId)
-        {
-            var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
-            return profile?.Role ?? UserRole.RegularUser;
-        }
-
-        public void UpdateUserRole(int userId, UserRole newRole)
-        {
-            var profile = _context.UserProfiles.FirstOrDefault(p => p.UserId == userId);
-            if (profile != null)
+            return await _context.Users.Select(u => new UserDTO
             {
-                profile.Role = newRole;
-                _context.SaveChanges();
-            }
+                UserId = u.Id,
+                FullName = u.FullName,
+                Email = u.Email,
+                Gender = u.Gender,
+                DateOfBirth = u.DateOfBirth,
+                ProfilePictureUrl = u.ProfilePictureUrl,
+                Role = u.Role,
+                Username = u.Username,
+                IsBanned = u.IsBanned
+            }).ToListAsync();
         }
 
-        public List<UserDTO> GetAllUsers()
+        public async Task<bool> CreateUserAsync(UserDTO User, string password)
         {
-            return _context.Users
-                .Include(u => u.UserProfile)
-                .Select(u => new UserDTO
-                {
-                    Id = u.Id,
-                    Username = u.Username,
-                    Email = u.Email
-                }).ToList();
+            if (await _context.Users.AnyAsync(u => u.Username == User.Username || u.Email == User.Email))
+            {
+                return false;
+            }
+
+            if (!IsValidPassword(password))
+            {
+                throw new ArgumentException("Password does not meet the required criteria.");
+            }
+
+            var user = new User
+            {
+                Username = User.Username,
+                Email = User.Email,
+                FullName = User.FullName,
+                Gender = User.Gender,
+                DateOfBirth = User.DateOfBirth,
+                ProfilePictureUrl = User.ProfilePictureUrl,
+                Role = User.Role
+            };
+
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
+
+            var passwordHash = HashPassword(password);
+            SavePasswordHash(user.Id, passwordHash);
+
+            return true;
+        }
+
+        public async Task<bool> ChangeUserRoleAsync(int userId, string role)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || !Enum.TryParse(role, out Role newRole))
+            {
+                return false;
+            }
+
+            user.Role = newRole;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> BanUserAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.IsBanned = true;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> UnbanUserAsync(int userId)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.IsBanned = false;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+        public async Task<bool> UpdateUserRoleAsync(int userId, Role newRole)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null)
+            {
+                return false;
+            }
+
+            user.Role = newRole;
+            _context.Users.Update(user);
+            await _context.SaveChangesAsync();
+
+            return true;
         }
 
         private static string HashPassword(string password)

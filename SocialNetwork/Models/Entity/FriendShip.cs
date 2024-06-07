@@ -8,8 +8,8 @@
         public DateTime RequestDate { get; set; }
         public DateTime? AcceptanceDate { get; set; }
 
-        public virtual UserProfile? User { get; set; }
-        public virtual UserProfile? Friend { get; set; }
+        public virtual User? User { get; set; }
+        public virtual User? Friend { get; set; }
 
         public Friendship() { }
     }

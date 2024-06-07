@@ -1,0 +1,11 @@
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+<div class="list-group">
+    @foreach (var friend in Model)
+    {
+        <a href="#" class="list-group-item list-group-item-action friend-link" data-id="@friend.UserId">
+            <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" width="30" height="30">
+            @friend.FullName
+        </a>
+    }
+</div>

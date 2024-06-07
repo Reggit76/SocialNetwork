@@ -9,9 +9,9 @@ namespace SocialNetwork.Services
 {
     public class CommentService : ICommentService
     {
-        private readonly UserDbContext _context;
+        private readonly ApplicationDbContext _context;
 
-        public CommentService(UserDbContext context)
+        public CommentService(ApplicationDbContext context)
         {
             _context = context;
         }

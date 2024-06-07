@@ -6,6 +6,6 @@
         public virtual Chat? Chat { get; set; }
 
         public int UserId { get; set; }
-        public virtual UserProfile? UserProfile { get; set; }
+        public virtual User? User { get; set; }
     }
 }

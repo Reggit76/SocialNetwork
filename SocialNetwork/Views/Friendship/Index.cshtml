@@ -1,100 +1,41 @@
 ﻿@model SocialNetwork.Models.ViewModels.FriendshipViewModel
 
-@{
-    ViewData["Title"] = "Friends";
-    var selectedTab = Model.SelectedTab ?? "Friends"; // Устанавливаем вкладку по умолчанию
-}
-
-<div style="display: flex;">
-    <div style="width: 30%; padding: 10px;">
-        <h2>
-            <button onclick="showTab('Friends')">Friends</button> |
-            <button onclick="showTab('AllUsers')">All Users</button>
-        </h2>
-        <div id="Friends" style="display: @(selectedTab == "Friends" ? "block" : "none")">
-            <form method="get" asp-action="Index">
-                <input type="hidden" name="tab" value="Friends" />
-                <input type="text" name="searchTerm" placeholder="Search friends..." value="@Model.SearchTerm" />
-                <button type="submit">Search</button>
-            </form>
-            <h3>Incoming Requests</h3>
-            <ul>
-                @foreach (var request in Model.IncomingRequests ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
-                {
-                    <li>
-                        <a asp-action="UserDetails" asp-route-userId="@request.UserId">@request.FullName</a>
-                    </li>
-                }
-            </ul>
-            <h3>Friends</h3>
-            <ul>
-                @foreach (var friend in Model.Friends ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
-                {
-                    <li>
-                        <a asp-action="UserDetails" asp-route-userId="@friend.UserId">@friend.FullName</a>
-                    </li>
-                }
-            </ul>
-        </div>
-        <div id="AllUsers" style="display: @(selectedTab == "AllUsers" ? "block" : "none")">
-            <form method="get" asp-action="Index">
-                <input type="hidden" name="tab" value="AllUsers" />
-                <input type="text" name="searchTerm" placeholder="Search users..." value="@Model.SearchTerm" />
-                <button type="submit">Search</button>
-            </form>
-            <ul>
-                @foreach (var user in Model.AllUsers ?? new List<SocialNetwork.Models.DTO.UserProfileDTO>())
-                {
-                    <li>
-                        <a asp-action="UserDetails" asp-route-userId="@user.UserId">@user.FullName</a>
-                    </li>
-                }
-            </ul>
-        </div>
+<div class="row">
+    <div class="col-md-4">
+        <input type="text" id="searchFriends" class="form-control mb-3" placeholder="Search Friends" />
+        <ul class="list-group friends-list">
+            @foreach (var friend in Model.Friends)
+            {
+                <li class="list-group-item friend-link" data-id="@friend.UserId">
+                    <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @friend.FullName
+                </li>
+            }
+        </ul>
+        <input type="text" id="searchAllUsers" class="form-control my-3" placeholder="Search All Users" />
+        <ul class="list-group all-users-list">
+            @foreach (var user in Model.AllUsers)
+            {
+                <li class="list-group-item user-link" data-id="@user.UserId">
+                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @user.FullName
+                </li>
+            }
+        </ul>
+        <h4>Incoming Friend Requests</h4>
+        <ul class="list-group incoming-requests-list">
+            @foreach (var request in Model.IncomingRequests)
+            {
+                <li class="list-group-item request-link" data-id="@request.UserId">
+                    <img src="@request.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
+                    @request.FullName
+                    <button id="acceptRequest" class="btn btn-success btn-sm" data-id="@request.UserId">Accept</button>
+                    <button id="declineRequest" class="btn btn-danger btn-sm" data-id="@request.UserId">Decline</button>
+                </li>
+            }
+        </ul>
     </div>
-    <div style="width: 70%; padding: 10px;">
-        @if (Model.SelectedUser != null)
-        {
-            <h2>@Model.SelectedUser.FullName</h2>
-            <p>Gender: @Model.SelectedUser.Gender</p>
-            <p>Date of Birth: @Model.SelectedUser.DateOfBirth.ToShortDateString()</p>
-            <p>Role: @Model.SelectedUser.Role</p>
-            <img src="@Model.SelectedUser.ProfilePictureUrl" alt="Profile Picture" />
-
-            @if (Model.IsFriend)
-            {
-                <form method="post" asp-action="RemoveFriend">
-                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
-                    <button type="submit">Remove Friend</button>
-                </form>
-            }
-            else if (Model.HasPendingRequest)
-            {
-                <form method="post" asp-action="AcceptFriendRequest">
-                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
-                    <button type="submit">Accept Friend Request</button>
-                </form>
-            }
-            else
-            {
-                <form method="post" asp-action="SendFriendRequest">
-                    <input type="hidden" name="friendId" value="@Model.SelectedUser.UserId" />
-                    <button type="submit">Send Friend Request</button>
-                </form>
-            }
-        }
-        else
-        {
-            <p>Select a user to see details.</p>
-        }
+    <div class="col-md-8" id="userDetails">
+        <!-- User details will be loaded here -->
     </div>
 </div>
-
-@section Scripts {
-    <script>
-        function showTab(tabName) {
-            document.getElementById('Friends').style.display = (tabName === 'Friends') ? 'block' : 'none';
-            document.getElementById('AllUsers').style.display = (tabName === 'AllUsers') ? 'block' : 'none';
-        }
-    </script>
-}

@@ -1,6 +1,6 @@
 ﻿namespace SocialNetwork.Models
 {
-    public enum UserRole
+    public enum Role
     {
         RegularUser, // Обычный пользователь
         Moderator, // Модератор
