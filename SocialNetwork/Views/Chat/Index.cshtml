@@ -1,41 +1,21 @@
-﻿@model IEnumerable<SocialNetwork.Models.DTO.ChatDTO>
+﻿@model IEnumerable<SocialNetwork.Models.ViewModels.ChatViewModel>
 
 @{
-    ViewData["Title"] = "My Chats";
+    ViewData["Title"] = "Chat";
 }
-
-<h2>My Chats</h2>
-
-<p>
-    <a asp-action="Create">Create New Chat</a>
-</p>
-
-<table class="table">
-    <thead>
-        <tr>
-            <th>
-                Name
-            </th>
-            <th>
-                Description
-            </th>
-            <th></th>
-        </tr>
-    </thead>
-    <tbody>
-        @foreach (var item in Model)
+@Html.Partial("_Header")
+<div class="main-content">
+    <h2>Chats</h2>
+    <a href="/Chat/Create" class="btn btn-primary">Create New Chat</a>
+    <div class="chat-list">
+        @foreach (var chat in Model)
         {
-            <tr>
-                <td>
-                    @Html.DisplayFor(modelItem => item.Name)
-                </td>
-                <td>
-                    @Html.DisplayFor(modelItem => item.Description)
-                </td>
-                <td>
-                    <a asp-action="Details" asp-route-id="@item.Id">Details</a>
-                </td>
-            </tr>
+            <div class="chat-item">
+                <h3>@chat.Name</h3>
+                <p>@chat.Description</p>
+                <a href="/Chat/Details/@chat.Id" class="btn btn-info">Open Chat</a>
+            </div>
         }
-    </tbody>
-</table>
+    </div>
+</div>
+@Html.Partial("_Footer")

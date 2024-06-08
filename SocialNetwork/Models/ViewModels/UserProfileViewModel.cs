@@ -1,13 +1,12 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using SocialNetwork.Models.DTO;
+using SocialNetwork.Models;
 using System.ComponentModel.DataAnnotations;
-using SocialNetwork.Models.DTO;
 
 namespace SocialNetwork.Models.ViewModels
 {
     public class UserProfileViewModel
     {
-        public int UserId { get; set; }
+        public int Id { get; set; }
 
         [Required]
         [StringLength(100, ErrorMessage = "Full name cannot be longer than 100 characters.")]
@@ -25,6 +24,13 @@ namespace SocialNetwork.Models.ViewModels
 
         [Required]
         public Role Role { get; set; }
+
+        public string Description { get; set; }
+
+        public string Username { get; set; }
+
+        public string Email { get; set; }
+
 
         public List<PostDTO> Posts { get; set; } = new List<PostDTO>();
     }

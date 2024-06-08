@@ -4,6 +4,7 @@ using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services.Interfaces;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace SocialNetwork.Controllers
 {
@@ -19,20 +20,20 @@ namespace SocialNetwork.Controllers
             _postService = postService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            var User = _userService.GetUserProfile(userId);
-            var posts = _postService.GetUserPosts(userId).ToList();
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            var user = await _userService.GetUserProfileAsync(userId);
+            var posts = (await _postService.GetUserPostsAsync(userId)).ToList();
 
             var model = new UserProfileViewModel
             {
-                UserId = User.UserId,
-                FullName = User.FullName,
-                DateOfBirth = User.DateOfBirth,
-                ProfilePictureUrl = User.ProfilePictureUrl,
-                Gender = User.Gender,
-                Role = User.Role,
+                Id = user.Id,
+                FullName = user.FullName,
+                DateOfBirth = user.DateOfBirth,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Gender = user.Gender,
+                Role = user.Role,
                 Posts = posts
             };
 
@@ -40,44 +41,51 @@ namespace SocialNetwork.Controllers
         }
 
         [HttpGet]
-        public IActionResult EditProfile(int userId)
+        public async Task<IActionResult> EditProfile(int userId)
         {
-            var User = _userService.GetUserProfile(userId);
+            var user = await _userService.GetUserProfileAsync(userId);
 
-            if (User == null)
+            if (user == null)
             {
                 return NotFound(); // Или любой другой обработчик ошибок
             }
 
             var model = new EditProfileViewModel
             {
-                UserId = User.UserId,
-                FullName = User.FullName,
-                DateOfBirth = User.DateOfBirth,
-                ProfilePictureUrl = User.ProfilePictureUrl,
-                Gender = User.Gender,
-                Role = User.Role
+                Id = user.Id,
+                FullName = user.FullName,
+                DateOfBirth = user.DateOfBirth,
+                ProfilePictureUrl = user.ProfilePictureUrl,
+                Gender = user.Gender,
+                Role = user.Role,
+                Username = user.Username,
+                Email = user.Email,
+                AvatarUrl = user.ProfilePictureUrl,
+                Description = user.Description
             };
 
             return View(model);
         }
 
         [HttpPost]
-        public IActionResult EditProfile(EditProfileViewModel model)
+        public async Task<IActionResult> EditProfile(EditProfileViewModel model)
         {
             if (ModelState.IsValid)
             {
-                var UserDTO = new UserDTO
+                var userDTO = new UserDTO
                 {
-                    UserId = model.UserId,
+                    Id = model.Id,
                     FullName = model.FullName,
                     DateOfBirth = model.DateOfBirth,
                     ProfilePictureUrl = model.ProfilePictureUrl,
                     Gender = model.Gender,
-                    Role = model.Role
+                    Role = model.Role,
+                    Username = model.Username,
+                    Email = model.Email,
+                    Description = model.Description
                 };
 
-                _userService.UpdateUserProfile(UserDTO);
+                await _userService.UpdateUserProfileAsync(userDTO);
                 return RedirectToAction("Index");
             }
 

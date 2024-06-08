@@ -1,17 +1,18 @@
-﻿using System.Collections.Generic;
-using SocialNetwork.Models;
+﻿using SocialNetwork.Models;
 using SocialNetwork.Models.DTO;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace SocialNetwork.Services.Interfaces
 {
     public interface IFriendshipService
     {
-        bool SendFriendRequest(int userId, int friendId);
-        bool AcceptFriendRequest(int userId, int friendId);
-        bool DeclineFriendRequest(int userId, int friendId);
-        bool RemoveFriend(int userId, int friendId);
-        List<UserDTO> GetFriends(int userId);
-        List<UserDTO> GetPendingRequests(int userId);
-        FriendshipStatus GetFriendshipStatus(int userId, int friendId);
+        Task<bool> SendFriendRequestAsync(int userId, int friendId);
+        Task<bool> AcceptFriendRequestAsync(int userId, int friendId);
+        Task<bool> DeclineFriendRequestAsync(int userId, int friendId);
+        Task<bool> RemoveFriendAsync(int userId, int friendId);
+        Task<List<UserDTO>> GetFriendsAsync(int userId);
+        Task<List<UserDTO>> GetPendingRequestsAsync(int userId);
+        Task<FriendshipStatus> GetFriendshipStatusAsync(int userId, int friendId);
     }
 }

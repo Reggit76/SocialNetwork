@@ -1,45 +1,20 @@
 ﻿<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Social Network</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <title>@ViewData["Title"] - SocialNetwork</title>
     <link rel="stylesheet" href="~/css/site.css" />
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js"></script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" />
 </head>
 <body>
-    <div class="navbar">
-        <a class="nav-link" href="/Home/Index">
-            <i class="fas fa-home"></i> Home
-        </a>
-        <a class="nav-link" href="/Profile/Index">
-            <i class="fas fa-user"></i> Profile
-        </a>
-        <a class="nav-link" href="/News/Index">
-            <i class="fas fa-newspaper"></i> News
-        </a>
-        <a class="nav-link" href="/Friendship/Index">
-            <i class="fas fa-users"></i> Friends
-        </a>
-        <a class="nav-link" href="/Chat/Index">
-            <i class="fas fa-comments"></i> Chat
-        </a>
-        @if (User.IsInRole("Administrator") || User.IsInRole("Moderator"))
-        {
-            <a class="nav-link" asp-area="" asp-controller="Users" asp-action="Index">
-                <i class="fa fa-cog"></i> Users
-            </a>
-        }
-        <a class="nav-link logout" href="/Account/Logout">
-            <i class="fas fa-sign-out-alt"></i> Logout
-        </a>
+    <div class="container">
+        @Html.Partial("_Navbar")
+        <div class="main-content">
+            @RenderBody()
+        </div>
+        @Html.Partial("_Footer")
     </div>
-    <div class="main-content">
-        @RenderBody()
-    </div>
-    @RenderSection("Scripts", required: false)
+    <script src="~/js/site.js"></script>
 </body>
 </html>

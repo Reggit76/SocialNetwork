@@ -11,7 +11,6 @@
 
         public virtual User? Author { get; set; }
         public virtual ICollection<Comment> Comments { get; set; } = new List<Comment>();
-        public virtual List<PostTag> Tags { get; set; } = new List<PostTag>();
 
         public Post() { }
     }

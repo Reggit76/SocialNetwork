@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services.Interfaces;
+using System.Threading.Tasks;
 
 namespace SocialNetwork.Controllers
 {
@@ -17,12 +18,12 @@ namespace SocialNetwork.Controllers
             _userService = userService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            var friends = _friendshipService.GetFriends(userId);
-            var allUsers = _userService.GetAllUsers();
-            var incomingRequests = _friendshipService.GetPendingRequests(userId);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            var friends = await _friendshipService.GetFriendsAsync(userId);
+            var allUsers = await _userService.GetAllUsersAsync();
+            var incomingRequests = await _friendshipService.GetPendingRequestsAsync(userId);
 
             var model = new FriendshipViewModel
             {
@@ -35,50 +36,50 @@ namespace SocialNetwork.Controllers
             return View(model);
         }
 
-        public IActionResult AllUsers()
+        public async Task<IActionResult> AllUsers()
         {
-            var allUsers = _userService.GetAllUsers();
+            var allUsers = await _userService.GetAllUsersAsync();
             return PartialView("_AllUsers", allUsers);
         }
 
         [HttpPost]
-        public IActionResult SendRequest(int id)
+        public async Task<IActionResult> SendRequest(int id)
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.SendFriendRequest(userId, id);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            await _friendshipService.SendFriendRequestAsync(userId, id);
             return RedirectToAction("Index");
         }
 
         [HttpPost]
-        public IActionResult AcceptRequest(int id)
+        public async Task<IActionResult> AcceptRequest(int id)
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.AcceptFriendRequest(userId, id);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            await _friendshipService.AcceptFriendRequestAsync(userId, id);
             return RedirectToAction("Index");
         }
 
         [HttpPost]
-        public IActionResult DeclineRequest(int id)
+        public async Task<IActionResult> DeclineRequest(int id)
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.DeclineFriendRequest(userId, id);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            await _friendshipService.DeclineFriendRequestAsync(userId, id);
             return RedirectToAction("Index");
         }
 
         [HttpPost]
-        public IActionResult RemoveFriend(int id)
+        public async Task<IActionResult> RemoveFriend(int id)
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
-            _friendshipService.RemoveFriend(userId, id);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            await _friendshipService.RemoveFriendAsync(userId, id);
             return RedirectToAction("Index");
         }
 
         [HttpGet]
-        public IActionResult GetUserDetails(int id)
+        public async Task<IActionResult> GetUserDetails(int id)
         {
-            var user = _userService.GetUserProfile(id);
-            var userId = _userService.GetUserId(User.Identity.Name);
-            var friendshipStatus = _friendshipService.GetFriendshipStatus(userId, id);
+            var user = await _userService.GetUserProfileAsync(id);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            var friendshipStatus = await _friendshipService.GetFriendshipStatusAsync(userId, id);
 
             var model = new FriendshipViewModel
             {

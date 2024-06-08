@@ -2,11 +2,8 @@
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using NuGet.Protocol;
-using SocialNetwork.Models.DTO;
-using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.ViewModels;
-using SocialNetwork.Services;
+using SocialNetwork.Models.DTO;
 using SocialNetwork.Services.Interfaces;
 using System.Collections.Generic;
 using System.Security.Claims;
@@ -34,9 +31,9 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                if (_userService.RegisterUser(model.Username, model.Email, model.Password))
+                if (await _userService.RegisterUserAsync(model))
                 {
-                    var user = _userService.AuthenticateUser(model.Username, model.Password);
+                    var user = await _userService.AuthenticateUserAsync(model.Email, model.Password);
                     if (user != null)
                     {
                         await AuthenticateUserAsync(user);
@@ -73,7 +70,7 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = _userService.AuthenticateUser(model.Username, model.Password);
+                var user = await _userService.AuthenticateUserAsync(model.Email, model.Password);
                 if (user != null)
                 {
                     var claims = new List<Claim>
@@ -87,6 +84,9 @@ namespace SocialNetwork.Controllers
                     var authProperties = new AuthenticationProperties
                     {
                         IsPersistent = model.RememberMe, // Использование свойства RememberMe
+                        ExpiresUtc = model.RememberMe
+                            ? DateTimeOffset.UtcNow.AddDays(30)  // Устанавливает долгую сессию
+                            : DateTimeOffset.UtcNow.AddMinutes(30) // Устанавливает короткую сессию
                     };
 
                     await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(claimsIdentity), authProperties);
@@ -115,11 +115,11 @@ namespace SocialNetwork.Controllers
 
         [HttpPost]
         [Authorize(Roles = "Administrator")]
-        public IActionResult RegisterAdmin(RegisterAdminViewModel model)
+        public async Task<IActionResult> RegisterAdmin(RegisterAdminViewModel model)
         {
             if (ModelState.IsValid)
             {
-                if (_userService.RegisterUserAsAdmin(model.Username, model.Email, model.Password, model.Role))
+                if (await _userService.RegisterUserAsAdminAsync(model.Username, model.Email, model.Password, model.Role))
                 {
                     return RedirectToAction("ManageUsers");
                 }
@@ -130,9 +130,9 @@ namespace SocialNetwork.Controllers
 
         [HttpGet]
         [Authorize(Roles = "Administrator")]
-        public IActionResult ManageUsers()
+        public async Task<IActionResult> ManageUsers()
         {
-            var users = _userService.GetAllUsers();
+            var users = await _userService.GetAllUsersAsync();
             return View(users);
         }
 
@@ -142,34 +142,32 @@ namespace SocialNetwork.Controllers
         {
             if (TempData["UserId"] is int userId)
             {
-                return View(new UserProfileViewModel { UserId = userId });
+                return View(new UserProfileViewModel { Id = userId });
             }
 
-            // Если UserId не найден в TempData, отобразим сообщение об ошибке
             ModelState.AddModelError("", "Unable to complete profile. Please try again.");
             return RedirectToAction("Login");
         }
 
         [HttpPost]
         [Authorize]
-        public IActionResult CompleteProfile(UserProfileViewModel model)
+        public async Task<IActionResult> CompleteProfile(UserProfileViewModel model)
         {
             if (ModelState.IsValid)
             {
                 var User = new UserDTO
                 {
-                    UserId = model.UserId,
+                    Id = model.Id,
                     FullName = model.FullName,
                     Gender = model.Gender,
                     DateOfBirth = model.DateOfBirth,
                     ProfilePictureUrl = model.ProfilePictureUrl
                 };
-                _userService.UpdateUserProfile(User);
+                await _userService.UpdateUserProfileAsync(User);
                 return RedirectToAction("Index", "Home");
             }
             ModelState.AddModelError("", "Failed to complete profile");
             return View(model);
         }
-
     }
 }

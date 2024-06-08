@@ -1,44 +1,30 @@
 ﻿@model IEnumerable<SocialNetwork.Models.DTO.PostDTO>
 
 @{
-    ViewData["Title"] = "News Feed";
+    ViewData["Title"] = "Posts";
 }
-
-<h2>News Feed</h2>
-
-<p>
-    <a asp-action="Create" class="btn btn-primary">Create New Post</a>
-</p>
-
-<table class="table">
-    <thead>
-        <tr>
-            <th>Author</th>
-            <th>Content</th>
-            <th>Date Posted</th>
-            <th>Tags</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
+@Html.Partial("_Header")
+<div class="main-content">
+    <h2>Posts</h2>
+    <a href="/Post/Create" class="btn btn-primary">Create New Post</a>
+    <div class="posts-container">
         @foreach (var post in Model)
         {
-            <tr>
-                <td>@post.UserId</td>
-                <td>@post.Content</td>
-                <td>@post.DatePosted</td>
-                <td>
-                    @foreach (var tag in post.Tags)
-                    {
-                        <span class="badge badge-primary">@tag</span>
-                    }
-                </td>
-                <td>
-                    <a asp-action="Details" asp-route-id="@post.Id" class="btn btn-info">Details</a>
-                    <a asp-action="Edit" asp-route-id="@post.Id" class="btn btn-warning">Edit</a>
-                    <a asp-action="Delete" asp-route-id="@post.Id" class="btn btn-danger">Delete</a>
-                </td>
-            </tr>
+            <div class="post">
+                <p>@post.Content</p>
+                @if (!string.IsNullOrEmpty(post.ImageUrl))
+                {
+                    <img src="@post.ImageUrl" alt="Post Image" />
+                }
+                <div class="post-buttons">
+                    <a href="/Post/Edit/@post.Id" class="btn btn-info">Edit</a>
+                    <form asp-action="Delete" method="post" style="display:inline;">
+                        <input type="hidden" name="id" value="@post.Id" />
+                        <button type="submit" class="btn btn-danger">Delete</button>
+                    </form>
+                </div>
+            </div>
         }
-    </tbody>
-</table>
+    </div>
+</div>
+@Html.Partial("_Footer")

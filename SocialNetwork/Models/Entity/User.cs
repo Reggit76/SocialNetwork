@@ -9,6 +9,7 @@
         public Gender Gender { get; set; }
         public DateTime DateOfBirth { get; set; }
         public string? ProfilePictureUrl { get; set; }
+        public string Description { get; set; } = string.Empty;
         public Role Role { get; set; }
         public bool IsBanned { get; set; } 
 

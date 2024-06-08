@@ -1,10 +1,12 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Services.Interfaces;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace SocialNetwork.Services
 {
@@ -17,9 +19,9 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public IEnumerable<PostDTO> GetAllPosts()
+        public async Task<IEnumerable<PostDTO>> GetAllPostsAsync()
         {
-            return _context.Posts
+            return await _context.Posts
                 .Include(p => p.Author)
                 .Include(p => p.Comments)
                 .Select(p => new PostDTO
@@ -29,17 +31,17 @@ namespace SocialNetwork.Services
                     Content = p.Content,
                     DatePosted = p.DatePosted,
                     LikesCount = p.LikesCount,
-                    ImageUrl = p.ImageUrl // Учитываем ImageUrl
+                    ImageUrl = p.ImageUrl
                 })
-                .ToList();
+                .ToListAsync();
         }
 
-        public PostDTO GetPostById(int id)
+        public async Task<PostDTO> GetPostByIdAsync(int id)
         {
-            var post = _context.Posts
+            var post = await _context.Posts
                 .Include(p => p.Author)
                 .Include(p => p.Comments)
-                .FirstOrDefault(p => p.Id == id);
+                .FirstOrDefaultAsync(p => p.Id == id);
 
             if (post == null) return null;
 
@@ -50,11 +52,11 @@ namespace SocialNetwork.Services
                 Content = post.Content,
                 DatePosted = post.DatePosted,
                 LikesCount = post.LikesCount,
-                ImageUrl = post.ImageUrl // Учитываем ImageUrl
+                ImageUrl = post.ImageUrl
             };
         }
 
-        public void CreatePost(PostDTO postDTO)
+        public async Task CreatePostAsync(PostDTO postDTO)
         {
             var post = new Post
             {
@@ -62,38 +64,38 @@ namespace SocialNetwork.Services
                 Content = postDTO.Content,
                 DatePosted = postDTO.DatePosted,
                 LikesCount = postDTO.LikesCount,
-                ImageUrl = postDTO.ImageUrl // Учитываем ImageUrl
+                ImageUrl = postDTO.ImageUrl
             };
 
-            _context.Posts.Add(post);
-            _context.SaveChanges();
+            await _context.Posts.AddAsync(post);
+            await _context.SaveChangesAsync();
         }
 
-        public void UpdatePost(PostDTO postDTO)
+        public async Task UpdatePostAsync(PostDTO postDTO)
         {
-            var post = _context.Posts.Find(postDTO.Id);
+            var post = await _context.Posts.FindAsync(postDTO.Id);
             if (post != null)
             {
                 post.Content = postDTO.Content;
                 post.DatePosted = postDTO.DatePosted;
                 post.LikesCount = postDTO.LikesCount;
-                post.ImageUrl = postDTO.ImageUrl; // Учитываем ImageUrl
+                post.ImageUrl = postDTO.ImageUrl;
 
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
 
-        public void DeletePost(int id)
+        public async Task DeletePostAsync(int id)
         {
-            var post = _context.Posts.Find(id);
+            var post = await _context.Posts.FindAsync(id);
             if (post != null)
             {
                 _context.Posts.Remove(post);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
 
-        public void AddComment(CommentDTO commentDTO)
+        public async Task AddCommentAsync(CommentDTO commentDTO)
         {
             commentDTO.DatePosted = DateTime.UtcNow;
             var comment = new Comment
@@ -103,33 +105,33 @@ namespace SocialNetwork.Services
                 Content = commentDTO.Content,
                 DatePosted = commentDTO.DatePosted
             };
-            _context.Comments.Add(comment);
-            _context.SaveChanges();
+            await _context.Comments.AddAsync(comment);
+            await _context.SaveChangesAsync();
         }
 
-        public void UpdateComment(CommentDTO commentDTO)
+        public async Task UpdateCommentAsync(CommentDTO commentDTO)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentDTO.Id);
+            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentDTO.Id);
             if (comment != null)
             {
                 comment.Content = commentDTO.Content;
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
 
-        public void DeleteComment(int commentId)
+        public async Task DeleteCommentAsync(int commentId)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId);
             if (comment != null)
             {
                 _context.Comments.Remove(comment);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
 
-        public IEnumerable<PostDTO> GetUserPosts(int userId)
+        public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
         {
-            return _context.Posts
+            return await _context.Posts
                 .Where(p => p.UserId == userId)
                 .Include(p => p.Author)
                 .Select(p => new PostDTO
@@ -139,9 +141,9 @@ namespace SocialNetwork.Services
                     Content = p.Content,
                     DatePosted = p.DatePosted,
                     LikesCount = p.LikesCount,
-                    ImageUrl = p.ImageUrl 
+                    ImageUrl = p.ImageUrl
                 })
-                .ToList();
+                .ToListAsync();
         }
     }
 }

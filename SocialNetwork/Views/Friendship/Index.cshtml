@@ -1,41 +1,62 @@
 ﻿@model SocialNetwork.Models.ViewModels.FriendshipViewModel
 
-<div class="row">
-    <div class="col-md-4">
-        <input type="text" id="searchFriends" class="form-control mb-3" placeholder="Search Friends" />
-        <ul class="list-group friends-list">
+@{
+    ViewData["Title"] = "Friends";
+}
+@Html.Partial("_Header")
+<div class="main-content">
+    <h2>Friends</h2>
+    <div class="tabs">
+        <button class="tab-link" onclick="showTab('friends')">Friends</button>
+        <button class="tab-link" onclick="showTab('allUsers')">All Users</button>
+        <button class="tab-link" onclick="showTab('requests')">Requests</button>
+    </div>
+    <div id="friends" class="tab-content">
+        <ul class="friends-list">
             @foreach (var friend in Model.Friends)
             {
-                <li class="list-group-item friend-link" data-id="@friend.UserId">
-                    <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
-                    @friend.FullName
+                <li class="list-group-item">
+                    <img src="@friend.ProfilePictureUrl" alt="Profile Picture" />
+                    @friend.FullName (@friend.Username)
+                    <button class="btn btn-danger" onclick="removeFriend(@friend.Id)">Remove</button>
                 </li>
             }
         </ul>
-        <input type="text" id="searchAllUsers" class="form-control my-3" placeholder="Search All Users" />
-        <ul class="list-group all-users-list">
+    </div>
+    <div id="allUsers" class="tab-content" style="display: none;">
+        <input type="text" id="searchAllUsers" placeholder="Search Users" class="form-control" />
+        <ul class="all-users-list">
             @foreach (var user in Model.AllUsers)
             {
-                <li class="list-group-item user-link" data-id="@user.UserId">
-                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
-                    @user.FullName
+                <li class="list-group-item">
+                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" />
+                    @user.FullName (@user.Username)
+                    <button class="btn btn-primary" onclick="sendRequest(@user.Id)">Add Friend</button>
                 </li>
             }
         </ul>
-        <h4>Incoming Friend Requests</h4>
-        <ul class="list-group incoming-requests-list">
+    </div>
+    <div id="requests" class="tab-content" style="display: none;">
+        <ul class="incoming-requests-list">
             @foreach (var request in Model.IncomingRequests)
             {
-                <li class="list-group-item request-link" data-id="@request.UserId">
-                    <img src="@request.ProfilePictureUrl" alt="Profile Picture" class="img-thumbnail rounded-circle" />
-                    @request.FullName
-                    <button id="acceptRequest" class="btn btn-success btn-sm" data-id="@request.UserId">Accept</button>
-                    <button id="declineRequest" class="btn btn-danger btn-sm" data-id="@request.UserId">Decline</button>
+                <li class="list-group-item">
+                    <img src="@request.ProfilePictureUrl" alt="Profile Picture" />
+                    @request.FullName (@request.Username)
+                    <button class="btn btn-success" onclick="acceptRequest(@request.Id)">Accept</button>
+                    <button class="btn btn-danger" onclick="declineRequest(@request.Id)">Decline</button>
                 </li>
             }
         </ul>
     </div>
-    <div class="col-md-8" id="userDetails">
-        <!-- User details will be loaded here -->
-    </div>
 </div>
+@Html.Partial("_Footer")
+
+<script>
+    function showTab(tabId) {
+        document.getElementById('friends').style.display = 'none';
+        document.getElementById('allUsers').style.display = 'none';
+        document.getElementById('requests').style.display = 'none';
+        document.getElementById(tabId).style.display = 'block';
+    }
+</script>

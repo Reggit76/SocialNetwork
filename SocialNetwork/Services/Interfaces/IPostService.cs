@@ -1,18 +1,19 @@
 ﻿using System.Collections.Generic;
+using System.Threading.Tasks;
 using SocialNetwork.Models.DTO;
 
 namespace SocialNetwork.Services.Interfaces
 {
     public interface IPostService
     {
-        IEnumerable<PostDTO> GetAllPosts();
-        PostDTO GetPostById(int id);
-        void CreatePost(PostDTO postDTO);
-        void UpdatePost(PostDTO postDTO);
-        void DeletePost(int id);
-        void AddComment(CommentDTO commentDTO);
-        void UpdateComment(CommentDTO commentDTO);
-        void DeleteComment(int commentId);
-        IEnumerable<PostDTO> GetUserPosts(int userId);
+        Task<IEnumerable<PostDTO>> GetAllPostsAsync();
+        Task<PostDTO> GetPostByIdAsync(int id);
+        Task CreatePostAsync(PostDTO postDTO);
+        Task UpdatePostAsync(PostDTO postDTO);
+        Task DeletePostAsync(int id);
+        Task AddCommentAsync(CommentDTO commentDTO);
+        Task UpdateCommentAsync(CommentDTO commentDTO);
+        Task DeleteCommentAsync(int commentId);
+        Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId);
     }
 }

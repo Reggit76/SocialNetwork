@@ -1,48 +1,44 @@
-﻿using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Models.DTO;
-using SocialNetwork.Services;
+using SocialNetwork.Services.Interfaces;
+using System.Threading.Tasks;
 
 namespace SocialNetwork.Controllers
 {
-    [Authorize]
     public class PostController : Controller
     {
-        private readonly PostService _postService;
+        private readonly IPostService _postService;
 
-        public PostController(PostService postService)
+        public PostController(IPostService postService)
         {
             _postService = postService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var posts = _postService.GetAllPosts();
+            var posts = await _postService.GetAllPostsAsync();
             return View(posts);
         }
 
-        [HttpGet]
         public IActionResult Create()
         {
             return View();
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Create(PostDTO postDTO)
+        public async Task<IActionResult> Create(PostDTO post)
         {
             if (ModelState.IsValid)
             {
-                _postService.CreatePost(postDTO);
-                return RedirectToAction(nameof(Index));
+                await _postService.CreatePostAsync(post);
+                return RedirectToAction("Index");
             }
-            return View(postDTO);
+            return View(post);
         }
 
-        [HttpGet]
-        public IActionResult Edit(int id)
+        public async Task<IActionResult> Edit(int id)
         {
-            var post = _postService.GetPostById(id);
+            var post = await _postService.GetPostByIdAsync(id);
             if (post == null)
             {
                 return NotFound();
@@ -51,35 +47,26 @@ namespace SocialNetwork.Controllers
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Edit(PostDTO postDTO)
+        public async Task<IActionResult> Edit(PostDTO post)
         {
             if (ModelState.IsValid)
             {
-                _postService.UpdatePost(postDTO);
-                return RedirectToAction(nameof(Index));
+                await _postService.UpdatePostAsync(post);
+                return RedirectToAction("Index");
             }
-            return View(postDTO);
+            return View(post);
         }
 
         [HttpPost]
-        [ValidateAntiForgeryToken]
-        public IActionResult Delete(int id)
+        public async Task<IActionResult> Delete(int id)
         {
-            _postService.DeletePost(id);
-            return RedirectToAction(nameof(Index));
-        }
-
-        [HttpPost, ActionName("Delete")]
-        public IActionResult DeleteConfirmed(int id)
-        {
-            _postService.DeletePost(id);
+            await _postService.DeletePostAsync(id);
             return RedirectToAction("Index");
         }
 
-        public IActionResult Details(int id)
+        public async Task<IActionResult> Details(int id)
         {
-            var post = _postService.GetPostById(id);
+            var post = await _postService.GetPostByIdAsync(id);
             if (post == null)
             {
                 return NotFound();
@@ -88,21 +75,21 @@ namespace SocialNetwork.Controllers
         }
 
         [HttpPost]
-        public IActionResult AddComment(CommentDTO commentDTO)
+        public async Task<IActionResult> AddComment(int postId, CommentDTO comment)
         {
             if (ModelState.IsValid)
             {
-                _postService.AddComment(commentDTO);
-                return RedirectToAction("Details", new { id = commentDTO.PostId });
+                await _postService.AddCommentAsync(comment);
+                return RedirectToAction("Details", new { id = postId });
             }
-            return RedirectToAction("Details", new { id = commentDTO.PostId });
+            return View(comment);
         }
 
         [HttpPost]
-        public IActionResult DeleteComment(int commentId, int postId)
+        public async Task<IActionResult> DeleteComment(int commentId)
         {
-            _postService.DeleteComment(commentId);
-            return RedirectToAction("Details", new { id = postId });
+            await _postService.DeleteCommentAsync(commentId);
+            return RedirectToAction("Index");
         }
     }
 }

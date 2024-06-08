@@ -13,7 +13,6 @@ namespace SocialNetwork.Data
         public DbSet<Chat> Chats { get; set; }
         public DbSet<Message> Messages { get; set; }
         public DbSet<ChatUser> ChatUsers { get; set; }
-        public DbSet<PostTag> PostTags { get; set; }
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
@@ -76,18 +75,9 @@ namespace SocialNetwork.Data
 
             modelBuilder.Entity<Post>()
                 .HasOne(p => p.Author)
-                .WithMany()
+                .WithMany(u => u.Posts)
                 .HasForeignKey(p => p.UserId)
                 .OnDelete(DeleteBehavior.Cascade);
-
-            // PostTag entity configuration
-            modelBuilder.Entity<PostTag>()
-                .HasKey(pt => new { pt.PostId, pt.Tag });
-
-            modelBuilder.Entity<PostTag>()
-                .HasOne(pt => pt.Post)
-                .WithMany(p => p.Tags)
-                .HasForeignKey(pt => pt.PostId);
 
             // Comment entity configuration
             modelBuilder.Entity<Comment>()

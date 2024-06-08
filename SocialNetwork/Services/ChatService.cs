@@ -32,10 +32,10 @@ namespace SocialNetwork.Services
             _context.SaveChanges();
         }
 
-        public List<ChatDTO> GetUserChats(int userId)
+        public List<ChatDTO> GetUserChats(int Id)
         {
             return _context.ChatUsers
-                .Where(cu => cu.UserId == userId)
+                .Where(cu => cu.UserId == Id)
                 .Include(cu => cu.Chat)
                 .ThenInclude(c => c.Messages)
                 .Include(cu => cu.Chat)
@@ -48,7 +48,7 @@ namespace SocialNetwork.Services
                     Description = cu.Chat.Description,
                     Participants = cu.Chat.Participants.Select(p => new UserDTO
                     {
-                        UserId = p.User.UserId,
+                        Id = p.User.Id,
                         FullName = p.User.FullName,
                         Gender = p.User.Gender,
                         DateOfBirth = p.User.DateOfBirth,
@@ -84,7 +84,7 @@ namespace SocialNetwork.Services
                 Description = chat.Description,
                 Participants = chat.Participants.Select(p => new UserDTO
                 {
-                    UserId = p.User.UserId,
+                    Id = p.User.Id,
                     FullName = p.User.FullName,
                     Gender = p.User.Gender,
                     DateOfBirth = p.User.DateOfBirth,
@@ -102,21 +102,21 @@ namespace SocialNetwork.Services
             };
         }
 
-        public void AddParticipant(int chatId, int userId)
+        public void AddParticipant(int chatId, int Id)
         {
             var chatUser = new ChatUser
             {
                 ChatId = chatId,
-                UserId = userId
+                UserId = Id
             };
 
             _context.ChatUsers.Add(chatUser);
             _context.SaveChanges();
         }
 
-        public void RemoveParticipant(int chatId, int userId)
+        public void RemoveParticipant(int chatId, int Id)
         {
-            var chatUser = _context.ChatUsers.FirstOrDefault(cu => cu.ChatId == chatId && cu.UserId == userId);
+            var chatUser = _context.ChatUsers.FirstOrDefault(cu => cu.ChatId == chatId && cu.UserId == Id);
             if (chatUser != null)
             {
                 _context.ChatUsers.Remove(chatUser);
@@ -150,7 +150,7 @@ namespace SocialNetwork.Services
                 .Include(cu => cu.User)
                 .Select(cu => new UserDTO
                 {
-                    UserId = cu.User.UserId,
+                    Id = cu.User.Id,
                     FullName = cu.User.FullName,
                     Gender = cu.User.Gender,
                     DateOfBirth = cu.User.DateOfBirth,

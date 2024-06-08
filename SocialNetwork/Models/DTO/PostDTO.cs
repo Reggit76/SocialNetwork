@@ -10,7 +10,6 @@
         public string? ImageUrl { get; set; }
         public UserDTO? AuthorProfile { get; set; }
 
-        public List<string> Tags { get; set; } = new List<string>();
         public List<CommentDTO> Comments { get; set; } = new List<CommentDTO>();
     }
 }

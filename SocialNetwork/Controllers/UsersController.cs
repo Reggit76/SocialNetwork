@@ -43,7 +43,7 @@ namespace SocialNetwork.Controllers
             }
             var model = new EditProfileViewModel
             {
-                Id = user.UserId,
+                Id = user.Id,
                 Username = user.Username,
                 Email = user.Email,
                 Gender = user.Gender,
@@ -151,29 +151,25 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = new User
+                var user = new UserDTO
                 {
                     Username = model.Username,
                     Email = model.Email,
                     Gender = model.Gender,
                     DateOfBirth = model.DateOfBirth,
-                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "/images/default-avatar.png" : model.ProfilePictureUrl,
+                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/images/default-avatar.png" : model.ProfilePictureUrl,
                     Description = model.Description,
                     Role = model.Role,
                     FullName = model.FullName
                 };
 
                 var result = await _userService.CreateUserAsync(user, model.Password);
-                if (result.Succeeded)
+                if (result)
                 {
                     await _userService.ChangeUserRoleAsync(user.Id, model.Role.ToString());
                     return RedirectToAction("Index");
                 }
 
-                foreach (var error in result.Errors)
-                {
-                    ModelState.AddModelError(string.Empty, error.Description);
-                }
             }
 
             return View(model);

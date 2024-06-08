@@ -20,9 +20,9 @@ namespace SocialNetwork.Controllers
             _userService = userService;
         }
 
-        public IActionResult Index()
+        public async Task<IActionResult> Index()
         {
-            var userId = _userService.GetUserId(User.Identity.Name);
+            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
             var chats = _chatService.GetUserChats(userId);
             return View(chats);
         }

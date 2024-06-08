@@ -24,9 +24,9 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public async Task<int> GetUserIdAsync(string Username)
+        public async Task<int> GetUserIdAsync(string email)
         {
-            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == Username);
+            var user = await _context.Users.SingleOrDefaultAsync(u => u.Email == email);
             return user?.Id ?? 0;
         }
 
@@ -62,9 +62,9 @@ namespace SocialNetwork.Services
             return true;
         }
 
-        public bool RegisterUserAsAdmin(string username, string email, string password, Role role, string fullName, Gender gender, DateTime dateOfBirth, string? profilePictureUrl, string? description)
+        public async Task<bool> RegisterUserAsAdminAsync(string username, string email, string password, Role role)
         {
-            if (_context.Users.Any(u => u.Username == username || u.Email == email))
+            if (await _context.Users.AnyAsync(u => u.Username == username || u.Email == email))
             {
                 return false;
             }
@@ -78,16 +78,11 @@ namespace SocialNetwork.Services
             {
                 Username = username,
                 Email = email,
-                FullName = fullName,
-                Gender = gender,
-                DateOfBirth = dateOfBirth,
-                ProfilePictureUrl = profilePictureUrl,
-                Description = description,
                 Role = role
             };
 
-            _context.Users.Add(user);
-            _context.SaveChanges();
+            await _context.Users.AddAsync(user);
+            await _context.SaveChangesAsync();
 
             var passwordHash = HashPassword(password);
             SavePasswordHash(user.Id, passwordHash);
@@ -102,7 +97,7 @@ namespace SocialNetwork.Services
                 return await _context.Users
                     .Select(u => new UserDTO
                     {
-                        UserId = u.Id,
+                        Id = u.Id,
                         FullName = u.FullName,
                         Email = u.Email,
                         Gender = u.Gender,
@@ -117,7 +112,7 @@ namespace SocialNetwork.Services
                 .Where(u => u.FullName.Contains(searchTerm) || u.Username.Contains(searchTerm))
                 .Select(u => new UserDTO
                 {
-                    UserId = u.Id,
+                    Id = u.Id,
                     FullName = u.FullName,
                     Email = u.Email,
                     Gender = u.Gender,
@@ -129,9 +124,9 @@ namespace SocialNetwork.Services
                 }).ToListAsync();
         }
 
-        public async Task<UserDTO> AuthenticateUserAsync(string Username, string password)
+        public async Task<UserDTO> AuthenticateUserAsync(string email, string password)
         {
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == Username);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user != null)
             {
                 var storedPasswordHash = GetPasswordHash(user.Id);
@@ -139,7 +134,7 @@ namespace SocialNetwork.Services
                 {
                     return new UserDTO
                     {
-                        UserId = user.Id,
+                        Id = user.Id,
                         FullName = user.FullName,
                         Email = user.Email,
                         Gender = user.Gender,
@@ -162,7 +157,7 @@ namespace SocialNetwork.Services
 
             return new UserDTO
             {
-                UserId = user.Id,
+                Id = user.Id,
                 FullName = user.FullName,
                 Email = user.Email,
                 Gender = user.Gender,
@@ -191,7 +186,7 @@ namespace SocialNetwork.Services
 
         public async Task<bool> UpdateUserProfileAsync(UserDTO User)
         {
-            var user = await _context.Users.FindAsync(User.UserId);
+            var user = await _context.Users.FindAsync(User.Id);
             if (user == null)
             {
                 return false;
@@ -215,7 +210,7 @@ namespace SocialNetwork.Services
         {
             return await _context.Users.Select(u => new UserDTO
             {
-                UserId = u.Id,
+                Id = u.Id,
                 FullName = u.FullName,
                 Email = u.Email,
                 Gender = u.Gender,
@@ -321,14 +316,12 @@ namespace SocialNetwork.Services
 
         private static string HashPassword(string password)
         {
-            var hashedBytes = SHA256.HashData(Encoding.UTF8.GetBytes(password));
-            return BitConverter.ToString(hashedBytes).Replace("-", "").ToLower();
+            return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
         private static bool VerifyPassword(string password, string passwordHash)
         {
-            var hashedPassword = HashPassword(password);
-            return hashedPassword == passwordHash;
+            return BCrypt.Net.BCrypt.Verify(password, passwordHash);
         }
 
         private static bool IsValidPassword(string password)
