@@ -4,6 +4,8 @@ using SocialNetwork.Models.Entity;
 using SocialNetwork.Services.Interfaces;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 
 namespace SocialNetwork.Services
 {
@@ -16,9 +18,9 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public CommentDTO GetCommentById(int commentId)
+        public async Task<CommentDTO> GetCommentByIdAsync(int commentId)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            var comment = await _context.Comments.Include(c => c.User).FirstOrDefaultAsync(c => c.Id == commentId);
             if (comment == null)
             {
                 return null;
@@ -29,40 +31,42 @@ namespace SocialNetwork.Services
                 PostId = comment.PostId,
                 UserId = comment.UserId,
                 Content = comment.Content,
-                DatePosted = comment.DatePosted
+                DatePosted = comment.DatePosted,
+                UserFullName = comment.User.FullName,
+                UserProfilePictureUrl = comment.User.ProfilePictureUrl
             };
         }
 
-        public void AddComment(CommentDTO commentDTO)
+        public async Task AddCommentAsync(CommentDTO commentDTO)
         {
             var comment = new Comment
             {
                 PostId = commentDTO.PostId,
                 UserId = commentDTO.UserId,
                 Content = commentDTO.Content,
-                DatePosted = DateTime.UtcNow // Преобразование в UTC
+                DatePosted = DateTime.UtcNow
             };
             _context.Comments.Add(comment);
-            _context.SaveChanges();
+            await _context.SaveChangesAsync();
         }
 
-        public void UpdateComment(CommentDTO commentDTO)
+        public async Task UpdateCommentAsync(CommentDTO commentDTO)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentDTO.Id);
+            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentDTO.Id);
             if (comment != null)
             {
                 comment.Content = commentDTO.Content;
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
 
-        public void DeleteComment(int commentId)
+        public async Task DeleteCommentAsync(int commentId)
         {
-            var comment = _context.Comments.FirstOrDefault(c => c.Id == commentId);
+            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId);
             if (comment != null)
             {
                 _context.Comments.Remove(comment);
-                _context.SaveChanges();
+                await _context.SaveChangesAsync();
             }
         }
     }

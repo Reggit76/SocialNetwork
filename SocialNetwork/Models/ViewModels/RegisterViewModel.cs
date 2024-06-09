@@ -31,7 +31,7 @@ namespace SocialNetwork.Models.ViewModels
         public DateTime DateOfBirth { get; set; }
 
         [Url]
-        public string? ProfilePictureUrl { get; set; } = string.Empty;
+        public string? ProfilePictureUrl { get; set; }
 
         public string? Description { get; set; } = string.Empty;
 

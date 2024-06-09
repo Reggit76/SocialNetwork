@@ -1,18 +1,34 @@
-﻿const connection = new signalR.HubConnectionBuilder()
-    .withUrl("/chathub")
-    .build();
+﻿// chats.js
 
-connection.on("ReceiveMessage", (senderId, content) => {
-    const messageElement = document.createElement("div");
-    messageElement.textContent = `User ${senderId}: ${content}`;
-    document.getElementById("messagesList").appendChild(messageElement);
-});
+$(document).ready(function () {
+    // Join chat group via SignalR
+    const chatId = $('#chatId').val();
+    const connection = new signalR.HubConnectionBuilder()
+        .withUrl("/chathub")
+        .build();
 
-connection.start().catch(err => console.error(err.toString()));
+    connection.start().then(function () {
+        connection.invoke("JoinChat", chatId).catch(function (err) {
+            return console.error(err.toString());
+        });
+    });
 
-document.getElementById("sendButton").addEventListener("click", () => {
-    const chatId = document.getElementById("chatId").value;
-    const senderId = document.getElementById("senderId").value;
-    const content = document.getElementById("messageInput").value;
-    connection.invoke("SendMessage", chatId, senderId, content).catch(err => console.error(err.toString()));
+    // Send message
+    $('#sendMessageForm').submit(function (event) {
+        event.preventDefault();
+        const message = $('#messageInput').val();
+        connection.invoke("SendMessage", chatId, message).catch(function (err) {
+            return console.error(err.toString());
+        });
+        $('#messageInput').val('');
+    });
+
+    // Receive message
+    connection.on("ReceiveMessage", function (user, message) {
+        const msg = `<div class="chat-message">
+            <strong>${user}</strong>
+            <p>${message}</p>
+        </div>`;
+        $('#chatMessages').append(msg);
+    });
 });

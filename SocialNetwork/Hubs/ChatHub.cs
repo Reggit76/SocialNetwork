@@ -7,16 +7,20 @@ namespace SocialNetwork.Hubs
     public class ChatHub : Hub
     {
         private readonly IMessageService _messageService;
+        private readonly IUserService _userService;
 
-        public ChatHub(IMessageService messageService)
+        public ChatHub(IMessageService messageService, IUserService userService)
         {
             _messageService = messageService;
+            _userService = userService;
         }
 
-        public async Task SendMessage(int chatId, int senderId, string content)
+        public async Task SendMessage(int chatId, string message)
         {
-            _messageService.SendMessage(chatId, senderId, content);
-            await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", senderId, content);
+            var senderId = int.Parse(Context.User.FindFirst("UserId").Value);
+            var userName = Context.User.Identity.Name;
+            _messageService.SendMessage(chatId, senderId, message);
+            await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", userName, message);
         }
 
         public async Task JoinChat(int chatId)

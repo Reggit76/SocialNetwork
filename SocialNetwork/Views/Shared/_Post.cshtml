@@ -2,9 +2,9 @@
 
 <div class="post mb-4">
     <div class="post-header d-flex align-items-center">
-        <img src="@Model.AuthorProfile.ProfilePictureUrl ?? " ~ /images/default-avatar.png"" alt="Avatar" class="post-avatar">
+        <img src="@(Model.AuthorProfile?.ProfilePictureUrl ?? "~/images/default-avatar.jpg")" alt="Avatar" class="post-avatar">
         <div>
-            <h5 class="m-0">@Model.AuthorProfile.FullName</h5>
+            <h5 class="m-0">@(Model.AuthorProfile?.FullName ?? "Unknown Author")</h5>
             <small>@Model.DatePosted.ToString("g")</small>
         </div>
     </div>
@@ -17,11 +17,44 @@
     </div>
     <div class="post-footer d-flex justify-content-between mt-2">
         <div>
-            <i class="far fa-thumbs-up"></i> @Model.LikesCount
+            <form asp-action="LikePost" method="post" class="d-inline">
+                <input type="hidden" name="postId" value="@Model.Id" />
+                <button type="submit" class="btn btn-link"><i class="far fa-thumbs-up"></i> Like</button>
+            </form>
+            <form asp-action="DislikePost" method="post" class="d-inline">
+                <input type="hidden" name="postId" value="@Model.Id" />
+                <button type="submit" class="btn btn-link"><i class="far fa-thumbs-down"></i> Dislike</button>
+            </form>
+            <span class="likes-count">@Model.LikesCount</span>
         </div>
         <div>
-            <a href="@Url.Action("EditPost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link">Edit</a>
-            <a href="@Url.Action("DeletePost", "Post", new { id = Model.Id })" class="btn btn-sm btn-link text-danger">Delete</a>
+            @if (User.FindFirst("UserId")?.Value == Model.UserId.ToString() || User.IsInRole("Administrator") || User.IsInRole("Moderator"))
+            {
+                <a href="@Url.Action("Edit", "News", new { id = Model.Id })" class="btn btn-sm btn-link">Edit</a>
+                <form asp-action="Delete" method="post" style="display:inline;">
+                    <input type="hidden" name="id" value="@Model.Id" />
+                    <button type="submit" class="btn btn-sm btn-link text-danger">Delete</button>
+                </form>
+            }
         </div>
+    </div>
+    <div class="comments mt-3">
+        <h6>Comments</h6>
+        @foreach (var comment in Model.Comments)
+        {
+            <div class="comment mb-2">
+                <img src="@(comment.UserProfilePictureUrl ?? "~/images/default-avatar.jpg")" alt="Avatar" class="post-avatar-small">
+                <strong>@comment.UserFullName</strong>
+                <small>@comment.DatePosted.ToString("g")</small>
+                <p>@comment.Content</p>
+            </div>
+        }
+        <form asp-action="AddComment" method="post">
+            <input type="hidden" name="postId" value="@Model.Id" />
+            <div class="form-group">
+                <textarea name="Content" class="form-control" rows="2" placeholder="Add a comment..."></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Comment</button>
+        </form>
     </div>
 </div>

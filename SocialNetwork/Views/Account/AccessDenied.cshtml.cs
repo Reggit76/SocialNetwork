@@ -1,9 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
-namespace SocialNetwork.Views.Home
+namespace SocialNetwork.Views.Account
 {
-    public class NewsModel : PageModel
+    public class AccessDeniedModel : PageModel
     {
         public void OnGet()
         {

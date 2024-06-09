@@ -1,4 +1,6 @@
-﻿namespace SocialNetwork.Models.Entity
+﻿using SocialNetwork.Models.DTO;
+
+namespace SocialNetwork.Models.Entity
 {
     public class User
     {
@@ -15,6 +17,7 @@
 
         public virtual ICollection<ChatUser> Chats { get; set; } = new List<ChatUser>();
         public virtual ICollection<Post> Posts { get; set; } = new List<Post>();
+        public virtual ICollection<Friendship> Friendships { get; set; } = new List<Friendship>();
 
         public User() { }
     }

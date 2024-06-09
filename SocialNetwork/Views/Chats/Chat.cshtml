@@ -1,0 +1,74 @@
+﻿@model SocialNetwork.Models.ViewModels.ChatDetailViewModel
+
+@{
+    ViewData["Title"] = "Chat";
+}
+
+<div class="main-content">
+    <h2>@Model.Chat.Name</h2>
+    <p>@Model.Chat.Description</p>
+
+    <div class="chat-participants">
+        @foreach (var participant in Model.Chat.Participants)
+        {
+            <div class="chat-participant">
+                <img src="@(participant.ProfilePictureUrl ?? "~/images/default-avatar.jpg")" alt="Avatar" class="avatar-small" />
+                <span>@participant.FullName</span>
+            </div>
+        }
+    </div>
+
+    <div class="chat-messages" id="messagesList">
+        @foreach (var message in Model.Chat.Messages)
+        {
+            <div class="chat-message">
+                <strong>@message.SenderId</strong>
+                <small>@message.Timestamp.ToString("g")</small>
+                <p>@message.Content</p>
+            </div>
+        }
+    </div>
+
+    <form id="sendMessageForm">
+        <div class="form-group">
+            <input type="text" class="form-control" id="messageContent" placeholder="Type your message" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Send</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
+    <script>
+        const connection = new signalR.HubConnectionBuilder().withUrl("/chathub").build();
+
+        connection.on("ReceiveMessage", function (user, message) {
+            const msg = `<div class="message"><strong>${user}</strong>: ${message}</div>`;
+            document.getElementById("messagesList").innerHTML += msg;
+        });
+
+        connection.start().catch(function (err) {
+            return console.error(err.toString());
+        });
+
+        document.getElementById("sendMessageForm").addEventListener("submit", function (event) {
+            event.preventDefault();
+            const messageInput = document.getElementById("messageContent");
+            const message = messageInput.value;
+            const chatId = @Model.Chat.Id;
+
+            fetch(`/Chats/SendMessage?chatId=${chatId}&message=${message}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }).then(response => {
+                if (response.ok) {
+                    messageInput.value = '';
+                } else {
+                    alert("Failed to send message");
+                }
+            });
+        });
+    </script>
+}

@@ -3,54 +3,156 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
 using SocialNetwork.Services;
 using SocialNetwork.Services.Interfaces;
+using SocialNetwork.Hubs;
+using SocialNetwork.Models.Entity;
+using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllersWithViews();
-
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
-    o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
-);
-
-builder.Services.AddScoped<IUserService, UserService>();
-builder.Services.AddScoped<IFriendshipService, FriendshipService>();
-builder.Services.AddScoped<IPostService, PostService>();
-builder.Services.AddScoped<IChatService, ChatService>();
-builder.Services.AddScoped<IMessageService, MessageService>();
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-})
-.AddCookie(CookieAuthenticationDefaults.AuthenticationScheme, options =>
-{
-    options.LoginPath = "/Account/Login";
-    options.LogoutPath = "/Account/Logout";
-    options.ExpireTimeSpan = TimeSpan.FromDays(7);
-    options.SlidingExpiration = true;
-});
+ConfigureServices(builder.Services, builder.Configuration);
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (!app.Environment.IsDevelopment())
-{
-    app.UseExceptionHandler("/Home/Error");
-    app.UseHsts();
-}
-
-app.UseHttpsRedirection();
-app.UseStaticFiles();
-
-app.UseRouting();
-
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapControllerRoute(
-    name: "default",
-    pattern: "{controller=Home}/{action=Index}/{id?}");
+Configure(app, app.Environment);
 
 app.Run();
+
+void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+{
+    services.AddControllersWithViews();
+    services.AddSignalR();
+
+    services.AddDbContext<ApplicationDbContext>(options =>
+        options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
+        o => o.UseQuerySplittingBehavior(QuerySplittingBehavior.SplitQuery))
+    );
+
+    services.AddScoped<IUserService, UserService>();
+    services.AddScoped<IFriendshipService, FriendshipService>();
+    services.AddScoped<IPostService, PostService>();
+    services.AddScoped<IChatService, ChatService>();
+    services.AddScoped<IMessageService, MessageService>();
+    services.AddScoped<ICommentService, CommentService>();
+
+    services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
+        .AddCookie(options =>
+        {
+            options.LoginPath = "/Account/Login";
+            options.LogoutPath = "/Account/Logout";
+            options.ExpireTimeSpan = TimeSpan.FromDays(7);
+            options.SlidingExpiration = true;
+        });
+
+    services.AddHttpContextAccessor();
+}
+
+void Configure(WebApplication app, IWebHostEnvironment env)
+{
+    if (!env.IsDevelopment())
+    {
+        app.UseExceptionHandler("/Home/Error");
+        app.UseHsts();
+    }
+
+    app.UseHttpsRedirection();
+    app.UseStaticFiles();
+
+    app.UseRouting();
+
+    app.UseAuthentication();
+    app.UseBanCheck();
+    app.UseAuthorization();
+
+    app.UseEndpoints(endpoints =>
+    {
+        endpoints.MapControllerRoute(
+            name: "default",
+            pattern: "{controller=Home}/{action=Index}/{id?}");
+        endpoints.MapHub<ChatHub>("/chathub");
+    });
+
+    EnsureDatabaseCreated(app.Services).Wait();
+}
+
+async Task EnsureDatabaseCreated(IServiceProvider services)
+{
+    using var scope = services.CreateScope();
+    var scopedServices = scope.ServiceProvider;
+    var context = scopedServices.GetRequiredService<ApplicationDbContext>();
+    context.Database.Migrate();
+
+    await CreateAdminUserAsync(scopedServices);
+}
+
+async Task CreateAdminUserAsync(IServiceProvider serviceProvider)
+{
+    var userService = serviceProvider.GetRequiredService<IUserService>();
+
+    string adminFullName = "Admin";
+    string adminUsername = "KingFrog";
+    string adminEmail = "KingFrog@admin.com";
+    string adminPassword = "Admin123!";
+
+    var adminUser = await userService.AuthenticateUserAsync(adminEmail, adminPassword);
+    if (adminUser == null)
+    {
+        var model = new RegisterViewModel
+        {
+            FullName = adminFullName,
+            Username = adminUsername,
+            Email = adminEmail,
+            Password = adminPassword,
+            Role = Role.Administrator
+        };
+
+        var result = await userService.RegisterUserAsync(model);
+        if (result)
+        {
+            adminUser = await userService.AuthenticateUserAsync(adminEmail, adminPassword);
+            if (adminUser != null)
+            {
+                await userService.ChangeUserRoleAsync(adminUser.Id, Role.Administrator.ToString());
+            }
+        }
+    }
+}
+
+
+// Extension method used to add the middleware to the HTTP request pipeline.
+public static class BanCheckMiddlewareExtensions
+{
+    public static IApplicationBuilder UseBanCheck(this IApplicationBuilder builder)
+    {
+        return builder.UseMiddleware<BanCheckMiddleware>();
+    }
+}
+
+public class BanCheckMiddleware
+{
+    private readonly RequestDelegate _next;
+
+    public BanCheckMiddleware(RequestDelegate next)
+    {
+        _next = next;
+    }
+
+    public async Task InvokeAsync(HttpContext context)
+    {
+        if (context.User.Identity.IsAuthenticated)
+        {
+            var userService = context.RequestServices.GetRequiredService<IUserService>();
+            var userId = await userService.GetUserIdAsync(context.User.Identity.Name);
+            var user = await userService.GetUserProfileAsync(userId);
+            if (user != null && user.IsBanned)
+            {
+                context.Response.Redirect("/Account/Banned");
+                return;
+            }
+        }
+
+        await _next(context);
+    }
+}

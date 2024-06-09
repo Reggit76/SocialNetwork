@@ -19,7 +19,7 @@ namespace SocialNetwork.Services
             _messageService = messageService;
         }
 
-        public void CreateChat(string name, string description, List<int> participantIds)
+        public bool CreateChat(string name, string description, List<int> participantIds)
         {
             var chat = new Chat
             {
@@ -29,13 +29,14 @@ namespace SocialNetwork.Services
             };
 
             _context.Chats.Add(chat);
-            _context.SaveChanges();
+            var result = _context.SaveChanges();
+            return result > 0; // Return true if chat was successfully created
         }
 
-        public List<ChatDTO> GetUserChats(int Id)
+        public List<ChatDTO> GetUserChats(int userId)
         {
             return _context.ChatUsers
-                .Where(cu => cu.UserId == Id)
+                .Where(cu => cu.UserId == userId)
                 .Include(cu => cu.Chat)
                 .ThenInclude(c => c.Messages)
                 .Include(cu => cu.Chat)
@@ -102,21 +103,21 @@ namespace SocialNetwork.Services
             };
         }
 
-        public void AddParticipant(int chatId, int Id)
+        public void AddParticipant(int chatId, int userId)
         {
             var chatUser = new ChatUser
             {
                 ChatId = chatId,
-                UserId = Id
+                UserId = userId
             };
 
             _context.ChatUsers.Add(chatUser);
             _context.SaveChanges();
         }
 
-        public void RemoveParticipant(int chatId, int Id)
+        public void RemoveParticipant(int chatId, int userId)
         {
-            var chatUser = _context.ChatUsers.FirstOrDefault(cu => cu.ChatId == chatId && cu.UserId == Id);
+            var chatUser = _context.ChatUsers.FirstOrDefault(cu => cu.ChatId == chatId && cu.UserId == userId);
             if (chatUser != null)
             {
                 _context.ChatUsers.Remove(chatUser);
@@ -140,7 +141,7 @@ namespace SocialNetwork.Services
 
         public void SendMessage(int chatId, int senderId, string content)
         {
-            _messageService.SendMessage(senderId, chatId, content);
+            _messageService.SendMessage(chatId, senderId, content);
         }
 
         public List<UserDTO> GetParticipants(int chatId)

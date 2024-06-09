@@ -48,7 +48,9 @@ namespace SocialNetwork.Controllers
                 Email = user.Email,
                 Gender = user.Gender,
                 AvatarUrl = user.ProfilePictureUrl,
-                Description = user.Description
+                Description = user.Description,
+                FullName = user.FullName,
+                DateOfBirth = user.DateOfBirth
             };
             return View(model);
         }
@@ -59,20 +61,25 @@ namespace SocialNetwork.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = await _userService.GetUserProfileAsync(model.Id);
-                if (user == null)
+                var user = new UserDTO
                 {
-                    return NotFound();
+                    Id = model.Id,
+                    Username = model.Username,
+                    Email = model.Email,
+                    Gender = model.Gender,
+                    ProfilePictureUrl = model.AvatarUrl,
+                    Description = model.Description,
+                    FullName = model.FullName,
+                    DateOfBirth = model.DateOfBirth
+                };
+
+                var result = await _userService.UpdateUserProfileAsync(user);
+                if (result)
+                {
+                    return RedirectToAction("Index");
                 }
 
-                user.Username = model.Username;
-                user.Email = model.Email;
-                user.Gender = model.Gender;
-                user.ProfilePictureUrl = model.AvatarUrl;
-                user.Description = model.Description;
-
-                await _userService.UpdateUserProfileAsync(user);
-                return RedirectToAction("Index");
+                ModelState.AddModelError(string.Empty, "An error occurred while updating the profile.");
             }
             return View(model);
         }
@@ -157,7 +164,7 @@ namespace SocialNetwork.Controllers
                     Email = model.Email,
                     Gender = model.Gender,
                     DateOfBirth = model.DateOfBirth,
-                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/images/default-avatar.png" : model.ProfilePictureUrl,
+                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/Images/default-avatar.jpg" : model.ProfilePictureUrl,
                     Description = model.Description,
                     Role = model.Role,
                     FullName = model.FullName
@@ -170,6 +177,7 @@ namespace SocialNetwork.Controllers
                     return RedirectToAction("Index");
                 }
 
+                ModelState.AddModelError("", "An error occurred while creating the user.");
             }
 
             return View(model);

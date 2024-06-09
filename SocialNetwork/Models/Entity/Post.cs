@@ -7,6 +7,7 @@
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
         public int LikesCount { get; set; }
+        public int DislikesCount { get; set; } 
         public string? ImageUrl { get; set; }
 
         public virtual User? Author { get; set; }

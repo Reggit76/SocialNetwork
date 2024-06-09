@@ -3,12 +3,13 @@
 @{
     ViewData["Title"] = "Error";
 }
-@Html.Partial("_Header")
-<div class="main-content">
-    <h2 class="text-danger">Error.</h2>
-    <h3 class="text-danger">An error occurred while processing your request.</h3>
-    <div>
-        <p>Request ID: <code>@Model.RequestId</code></p>
-    </div>
-</div>
-@Html.Partial("_Footer")
+
+<h1 class="text-danger">Error.</h1>
+<h2 class="text-danger">An error occurred while processing your request.</h2>
+@if (Model?.RequestId != null)
+{
+    <p>Request ID: <code>@Model.RequestId</code></p>
+}
+<p>
+    <a asp-action="Index" asp-controller="Home">Back to Home</a>
+</p>

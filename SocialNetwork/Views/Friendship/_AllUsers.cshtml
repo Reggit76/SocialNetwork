@@ -1,0 +1,21 @@
+﻿@model IEnumerable<SocialNetwork.Models.DTO.UserDTO>
+
+<div id="all-users" class="tab-pane fade show active">
+    <h3>All Users</h3>
+    <input type="text" id="searchUsers" placeholder="Search Users" class="form-control" />
+    <ul class="list-group">
+        @foreach (var user in Model)
+        {
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="avatar-small" />
+                    <a href="/Profile/Index/@user.Id">@user.FullName</a>
+                </div>
+                <form asp-action="SendRequest" method="post" style="display:inline;">
+                    <input type="hidden" name="id" value="@user.Id" />
+                    <button type="submit" class="btn btn-primary">Add Friend</button>
+                </form>
+            </li>
+        }
+    </ul>
+</div>

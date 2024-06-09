@@ -3,8 +3,8 @@
 @foreach (var friend in Model)
 {
     <li class="list-group-item">
-        <img src="@friend.ProfilePictureUrl" alt="Profile Picture" />
-        @friend.FullName (@friend.Username)
+        <img src="@friend.ProfilePictureUrl" alt="Profile Picture" class="avatar-small" />
+        <a href="/Profile/Index/@friend.Id">@friend.FullName</a> (@friend.Username)
         <button class="btn btn-danger" onclick="removeFriend(@friend.Id)">Remove</button>
     </li>
 }

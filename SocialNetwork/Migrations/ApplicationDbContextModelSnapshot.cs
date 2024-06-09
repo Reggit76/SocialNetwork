@@ -164,6 +164,9 @@ namespace SocialNetwork.Migrations
                     b.Property<DateTime>("DatePosted")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<int>("DislikesCount")
+                        .HasColumnType("integer");
+
                     b.Property<string>("ImageUrl")
                         .HasColumnType("text");
 
@@ -291,7 +294,7 @@ namespace SocialNetwork.Migrations
                         .IsRequired();
 
                     b.HasOne("SocialNetwork.Models.Entity.User", "User")
-                        .WithMany()
+                        .WithMany("Friendships")
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
@@ -351,6 +354,8 @@ namespace SocialNetwork.Migrations
             modelBuilder.Entity("SocialNetwork.Models.Entity.User", b =>
                 {
                     b.Navigation("Chats");
+
+                    b.Navigation("Friendships");
 
                     b.Navigation("Posts");
                 });

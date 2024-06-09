@@ -3,8 +3,8 @@
 @{
     ViewData["Title"] = "Register";
 }
-@Html.Partial("_Header")
-<div class="main-content">
+
+<div class="registration-container">
     <h2>Register</h2>
     <form asp-action="Register" method="post">
         <div class="form-group">
@@ -19,12 +19,14 @@
         </div>
         <div class="form-group">
             <label asp-for="Password"></label>
-            <input asp-for="Password" class="form-control" />
+            <input asp-for="Password" class="form-control" type="password" id="password" />
+            <button type="button" onclick="togglePasswordVisibility()">Show Password</button>
             <span asp-validation-for="Password" class="text-danger"></span>
         </div>
         <div class="form-group">
             <label asp-for="ConfirmPassword"></label>
-            <input asp-for="ConfirmPassword" class="form-control" />
+            <input asp-for="ConfirmPassword" class="form-control" type="password" id="confirmPassword" />
+            <button type="button" onclick="toggleConfirmPasswordVisibility()">Show Password</button>
             <span asp-validation-for="ConfirmPassword" class="text-danger"></span>
         </div>
         <div class="form-group">
@@ -44,7 +46,7 @@
         </div>
         <div class="form-group">
             <label asp-for="DateOfBirth"></label>
-            <input asp-for="DateOfBirth" class="form-control" />
+            <input asp-for="DateOfBirth" class="form-control" type="date" />
             <span asp-validation-for="DateOfBirth" class="text-danger"></span>
         </div>
         <div class="form-group">
@@ -55,4 +57,25 @@
         <button type="submit" class="btn btn-primary">Register</button>
     </form>
 </div>
-@Html.Partial("_Footer")
+
+@section Scripts {
+    <script>
+        function togglePasswordVisibility() {
+            var passwordField = document.getElementById('password');
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+            } else {
+                passwordField.type = 'password';
+            }
+        }
+
+        function toggleConfirmPasswordVisibility() {
+            var passwordField = document.getElementById('confirmPassword');
+            if (passwordField.type === 'password') {
+                passwordField.type = 'text';
+            } else {
+                passwordField.type = 'password';
+            }
+        }
+    </script>
+}

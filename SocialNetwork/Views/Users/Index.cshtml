@@ -3,26 +3,44 @@
 @{
     ViewData["Title"] = "User Management";
 }
-@Html.Partial("_Header")
 <div class="main-content">
     <h2>User Management</h2>
-    <a href="/Users/Create" class="btn btn-primary">Create New User</a>
+    <a href="/Users/Create" class="btn btn-primary mb-3">Create New User</a>
     <div class="user-list">
-        <input type="text" id="searchUsers" placeholder="Search Users" class="form-control" />
-        <ul class="user-list">
+        <input type="text" id="searchUsers" placeholder="Search Users" class="form-control mb-3" />
+        <ul class="list-group">
             @foreach (var user in Model)
             {
-                <li class="list-group-item">
-                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" />
-                    @user.FullName (@user.Username)
-                    <a href="/Users/Edit/@user.Id" class="btn btn-info">Edit</a>
-                    <form asp-action="BanUser" method="post" style="display:inline;">
-                        <input type="hidden" name="id" value="@user.Id" />
-                        <button type="submit" class="btn btn-warning">@user.IsBanned ? "Unban" : "Ban"</button>
-                    </form>
+                <li class="list-group-item d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center">
+                        <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="rounded-circle mr-3" style="width: 50px; height: 50px;" />
+                        <div>
+                            <strong><a href="/Profile/Index/@user.Id">@user.FullName</a> (@user.Username)</strong>
+                            <p class="mb-0 text-muted">@user.Email</p>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <a href="/Users/Edit/@user.Id" class="btn btn-info mr-2">Edit</a>
+                        <form asp-action="@((user.IsBanned) ? "UnbanUser" : "BanUser")" method="post" style="display:inline;">
+                            <input type="hidden" name="id" value="@user.Id" />
+                            <button type="submit" class="btn btn-warning">
+                                @(user.IsBanned ? "Unban" : "Ban")
+                            </button>
+                        </form>
+                    </div>
                 </li>
             }
         </ul>
     </div>
 </div>
-@Html.Partial("_Footer")
+
+<script>
+    $(document).ready(function () {
+        $("#searchUsers").on("keyup", function () {
+            var value = $(this).val().toLowerCase();
+            $(".user-list .list-group-item").filter(function () {
+                $(this).toggle($(this).text().toLowerCase().indexOf(value) > -1)
+            });
+        });
+    });
+</script>

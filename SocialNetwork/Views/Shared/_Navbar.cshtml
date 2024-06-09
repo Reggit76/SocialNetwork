@@ -1,9 +1,38 @@
-﻿<nav class="navbar">
-    <a class="navbar-brand" href="/">SocialNetwork</a>
+﻿@inject SocialNetwork.Services.Interfaces.IUserService _userService
+
+@{
+    var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+}
+
+<nav class="navbar">
+    <img src="~/images/logo.png" alt="Logo" class="navbar-logo" />
     <a class="nav-link" href="/Home/Index"><i class="fa fa-home"></i> Home</a>
-    <a class="nav-link" href="/Profile/Index"><i class="fa fa-user"></i> Profile</a>
-    <a class="nav-link" href="/Friends/Index"><i class="fa fa-users"></i> Friends</a>
-    <a class="nav-link" href="/Chat/Index"><i class="fa fa-comments"></i> Chat</a>
-    <a class="nav-link" href="/Admin/Index" class="admin"><i class="fa fa-cog"></i> Admin</a>
-    <a class="nav-link logout" href="/Account/Logout"><i class="fa fa-sign-out"></i> Logout</a>
+    <a class="nav-link" href="/Profile/Index/@userId"><i class="fa fa-user"></i> Profile</a>
+    <a class="nav-link" href="/Friendship/Index"><i class="fa fa-users"></i> Friends</a>
+    <a class="nav-link" href="/Chats/Index"><i class="fa fa-comments"></i> Chat</a>
+    <a class="nav-link" href="/News/Index"><i class="fa fa-newspaper"></i> News</a>
+
+    @if (User.Identity.IsAuthenticated)
+    {
+        if (userId != 0)
+        {
+            var user = await _userService.GetUserProfileAsync(userId);
+            if (user != null && (user.Role == Role.Administrator || user.Role == Role.Moderator))
+            {
+                <a class="nav-link" href="/Users/Index"><i class="fa fa-cog"></i> Admin</a>
+            }
+        }
+    }
+
+    <div class="auth-buttons">
+        @if (User.Identity.IsAuthenticated)
+        {
+            <a class="nav-link logout" href="/Account/Logout"><i class="fa fa-sign-out"></i> Logout</a>
+        }
+        else
+        {
+            <a class="nav-link" href="/Account/Login"><i class="fa fa-sign-in-alt"></i> Login</a>
+            <a class="nav-link" href="/Account/Register"><i class="fa fa-user-plus"></i> Register</a>
+        }
+    </div>
 </nav>

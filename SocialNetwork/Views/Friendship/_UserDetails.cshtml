@@ -1,0 +1,19 @@
+﻿@model SocialNetwork.Models.DTO.UserDTO
+
+<div class="modal fade" id="userDetailsModal" tabindex="-1" role="dialog" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="userDetailsModalLabel">@Model.FullName</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body user-details">
+                <img src="@Model.ProfilePictureUrl" alt="Avatar" class="avatar-large" />
+                <h2>@Model.FullName</h2>
+                <p>@Model.Description</p>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,17 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using SocialNetwork.Models.DTO;
 
 namespace SocialNetwork.Models.ViewModels
 {
     public class ChatViewModel
     {
-        public int Id { get; set; }
-        [Required]
-        public string Name { get; set; }
-
-        [Required]
-        public string Description { get; set; }
-
-        [Required]
-        public string Participants { get; set; } 
+        public List<ChatDTO> Chats { get; set; }
     }
 }

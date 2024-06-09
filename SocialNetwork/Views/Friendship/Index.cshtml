@@ -3,60 +3,87 @@
 @{
     ViewData["Title"] = "Friends";
 }
-@Html.Partial("_Header")
+
 <div class="main-content">
     <h2>Friends</h2>
+    <input type="text" id="searchFriends" placeholder="Search..." class="form-control mb-3" />
+
     <div class="tabs">
-        <button class="tab-link" onclick="showTab('friends')">Friends</button>
-        <button class="tab-link" onclick="showTab('allUsers')">All Users</button>
-        <button class="tab-link" onclick="showTab('requests')">Requests</button>
+        <button class="btn btn-primary" id="show-friends">Friends</button>
+        <button class="btn btn-secondary" id="show-all-users">All Users</button>
+        <button class="btn btn-success" id="show-incoming-requests">Incoming Requests</button>
     </div>
-    <div id="friends" class="tab-content">
-        <ul class="friends-list">
-            @foreach (var friend in Model.Friends)
-            {
-                <li class="list-group-item">
-                    <img src="@friend.ProfilePictureUrl" alt="Profile Picture" />
-                    @friend.FullName (@friend.Username)
-                    <button class="btn btn-danger" onclick="removeFriend(@friend.Id)">Remove</button>
-                </li>
-            }
-        </ul>
+
+    <div id="friends-list" class="friends-container">
+        @foreach (var friend in Model.Friends)
+        {
+            <div class="friend-item">
+                <img src="@friend.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
+                <p><a href="/Profile/Index/@friend.Id">@friend.FullName</a></p>
+                <p>@friend.Description</p>
+                <form asp-action="RemoveFriend" method="post">
+                    <input type="hidden" name="id" value="@friend.Id" />
+                    <button type="submit" class="btn btn-danger">Remove Friend</button>
+                </form>
+                <a href="/Chat/StartChatWithUser?userId=@friend.Id" class="btn btn-info">Invite to Chat</a>
+            </div>
+        }
     </div>
-    <div id="allUsers" class="tab-content" style="display: none;">
-        <input type="text" id="searchAllUsers" placeholder="Search Users" class="form-control" />
-        <ul class="all-users-list">
-            @foreach (var user in Model.AllUsers)
-            {
-                <li class="list-group-item">
-                    <img src="@user.ProfilePictureUrl" alt="Profile Picture" />
-                    @user.FullName (@user.Username)
-                    <button class="btn btn-primary" onclick="sendRequest(@user.Id)">Add Friend</button>
-                </li>
-            }
-        </ul>
+
+    <div id="all-users-list" class="friends-container d-none">
+        @foreach (var user in Model.AllUsers)
+        {
+            <div class="user-item">
+                <img src="@user.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
+                <p><a href="/Profile/Index/@user.Id">@user.FullName</a></p>
+                <p>@user.Description</p>
+                <form asp-action="SendRequest" method="post">
+                    <input type="hidden" name="id" value="@user.Id" />
+                    <button type="submit" class="btn btn-primary">Add Friend</button>
+                </form>
+                <a href="/Chat/StartChatWithUser?userId=@user.Id" class="btn btn-info">Invite to Chat</a>
+            </div>
+        }
     </div>
-    <div id="requests" class="tab-content" style="display: none;">
-        <ul class="incoming-requests-list">
-            @foreach (var request in Model.IncomingRequests)
-            {
-                <li class="list-group-item">
-                    <img src="@request.ProfilePictureUrl" alt="Profile Picture" />
-                    @request.FullName (@request.Username)
-                    <button class="btn btn-success" onclick="acceptRequest(@request.Id)">Accept</button>
-                    <button class="btn btn-danger" onclick="declineRequest(@request.Id)">Decline</button>
-                </li>
-            }
-        </ul>
+
+    <div id="incoming-requests-list" class="friends-container d-none">
+        @foreach (var request in Model.IncomingRequests)
+        {
+            <div class="request-item">
+                <img src="@request.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
+                <p><a href="/Profile/Index/@request.Id">@request.FullName</a></p>
+                <p>@request.Description</p>
+                <form asp-action="AcceptRequest" method="post">
+                    <input type="hidden" name="id" value="@request.Id" />
+                    <button type="submit" class="btn btn-success">Accept</button>
+                </form>
+                <form asp-action="DeclineRequest" method="post" style="margin-left: 10px;">
+                    <input type="hidden" name="id" value="@request.Id" />
+                    <button type="submit" class="btn btn-danger">Decline</button>
+                </form>
+            </div>
+        }
     </div>
 </div>
-@Html.Partial("_Footer")
 
-<script>
-    function showTab(tabId) {
-        document.getElementById('friends').style.display = 'none';
-        document.getElementById('allUsers').style.display = 'none';
-        document.getElementById('requests').style.display = 'none';
-        document.getElementById(tabId).style.display = 'block';
-    }
-</script>
+@section Scripts {
+    <script>
+        document.getElementById('show-friends').addEventListener('click', function () {
+            document.getElementById('friends-list').classList.remove('d-none');
+            document.getElementById('all-users-list').classList.add('d-none');
+            document.getElementById('incoming-requests-list').classList.add('d-none');
+        });
+
+        document.getElementById('show-all-users').addEventListener('click', function () {
+            document.getElementById('friends-list').classList.add('d-none');
+            document.getElementById('all-users-list').classList.remove('d-none');
+            document.getElementById('incoming-requests-list').classList.add('d-none');
+        });
+
+        document.getElementById('show-incoming-requests').addEventListener('click', function () {
+            document.getElementById('friends-list').classList.add('d-none');
+            document.getElementById('all-users-list').classList.add('d-none');
+            document.getElementById('incoming-requests-list').classList.remove('d-none');
+        });
+    </script>
+}

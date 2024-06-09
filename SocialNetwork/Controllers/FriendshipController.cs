@@ -2,6 +2,7 @@
 using Microsoft.AspNetCore.Mvc;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services.Interfaces;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace SocialNetwork.Controllers
@@ -22,7 +23,8 @@ namespace SocialNetwork.Controllers
         {
             var userId = await _userService.GetUserIdAsync(User.Identity.Name);
             var friends = await _friendshipService.GetFriendsAsync(userId);
-            var allUsers = await _userService.GetAllUsersAsync();
+            var friendIds = friends.Select(f => f.Id).ToList();
+            var allUsers = (await _userService.GetAllUsersAsync()).Where(u => !friendIds.Contains(u.Id) && u.Id != userId).ToList();
             var incomingRequests = await _friendshipService.GetPendingRequestsAsync(userId);
 
             var model = new FriendshipViewModel
@@ -36,19 +38,26 @@ namespace SocialNetwork.Controllers
             return View(model);
         }
 
-        public async Task<IActionResult> AllUsers()
-        {
-            var allUsers = await _userService.GetAllUsersAsync();
-            return PartialView("_AllUsers", allUsers);
-        }
+
 
         [HttpPost]
         public async Task<IActionResult> SendRequest(int id)
         {
             var userId = await _userService.GetUserIdAsync(User.Identity.Name);
-            await _friendshipService.SendFriendRequestAsync(userId, id);
+            if (userId == 0 || id == 0)
+            {
+                return BadRequest("Invalid user ID.");
+            }
+
+            var result = await _friendshipService.SendFriendRequestAsync(userId, id);
+            if (!result)
+            {
+                return BadRequest("Failed to send friend request.");
+            }
+
             return RedirectToAction("Index");
         }
+
 
         [HttpPost]
         public async Task<IActionResult> AcceptRequest(int id)

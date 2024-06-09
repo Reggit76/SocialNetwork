@@ -1,0 +1,22 @@
+﻿@model SocialNetwork.Models.ViewModels.NewsViewModel
+
+@{
+    ViewData["Title"] = "News";
+}
+
+<div class="main-content">
+    <h2>News</h2>
+    <div class="filter-buttons mb-3">
+        <a href="@Url.Action("Index", new { filter = "all" })" class="btn @(Model.Filter == "all" ? "btn-primary" : "btn-secondary")">All Posts</a>
+        <a href="@Url.Action("Index", new { filter = "friends" })" class="btn @(Model.Filter == "friends" ? "btn-primary" : "btn-secondary")">Friends' Posts</a>
+    </div>
+
+    <a href="@Url.Action("Create")" class="btn btn-success mb-3">Create Post</a>
+
+    <div class="posts-container">
+        @foreach (var post in Model.Posts)
+        {
+            @Html.Partial("_Post", post)
+        }
+    </div>
+</div>

@@ -1,0 +1,51 @@
+﻿@model SocialNetwork.Models.DTO.ChatDTO
+
+@{
+    ViewData["Title"] = "Chat Details";
+}
+
+<div class="main-content">
+    <h2>@Model.Name</h2>
+    <p>@Model.Description</p>
+    <h4>Participants</h4>
+    <ul>
+        @foreach (var participant in Model.Participants)
+        {
+            <li>@participant.FullName (@participant.Username)</li>
+        }
+    </ul>
+    <h4>Messages</h4>
+    <div class="chat-messages">
+        @foreach (var message in Model.Messages)
+        {
+            <div class="chat-message">
+                <strong>@message.SenderId</strong>
+                <small>@message.Timestamp.ToString("g")</small>
+                <p>@message.Content</p>
+            </div>
+        }
+    </div>
+    <form id="sendMessageForm">
+        <div class="form-group">
+            <input type="text" class="form-control" id="messageContent" placeholder="Type your message" required />
+        </div>
+        <button type="submit" class="btn btn-primary">Send</button>
+    </form>
+</div>
+
+@section Scripts {
+    <script src="~/js/main.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#sendMessageForm').submit(function (event) {
+                event.preventDefault();
+                const chatId = '@Model.Id';
+                const content = $('#messageContent').val();
+                $.post('/Chats/SendMessage', { chatId: chatId, message: content }, function () {
+                    $('#messageContent').val('');
+                    location.reload(); // Refresh the page to show the new message
+                });
+            });
+        });
+    </script>
+}

@@ -151,7 +151,7 @@ namespace SocialNetwork.Data
 
             modelBuilder.Entity<Friendship>()
                 .HasOne(f => f.User)
-                .WithMany()
+                .WithMany(u => u.Friendships)
                 .HasForeignKey(f => f.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
 

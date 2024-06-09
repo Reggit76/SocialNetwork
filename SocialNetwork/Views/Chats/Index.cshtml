@@ -1,0 +1,90 @@
+﻿@model IEnumerable<SocialNetwork.Models.DTO.ChatDTO>
+
+@{
+    ViewData["Title"] = "Chats";
+}
+
+<div class="main-content">
+    <h2>Chats</h2>
+    <button class="btn btn-primary mb-3" data-toggle="modal" data-target="#createChatModal">New Chat</button>
+
+    <div class="list-group">
+        @foreach (var chat in Model)
+        {
+            <a href="@Url.Action("Chat", new { id = chat.Id })" class="list-group-item list-group-item-action">
+                <h5 class="mb-1">@chat.Name</h5>
+                <p class="mb-1">@chat.Description</p>
+                <small>Participants: @string.Join(", ", chat.Participants.Select(p => p.FullName))</small>
+            </a>
+        }
+    </div>
+</div>
+
+<!-- Create Chat Modal -->
+<div class="modal fade" id="createChatModal" tabindex="-1" role="dialog" aria-labelledby="createChatModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="createChatForm">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createChatModalLabel">Create New Chat</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="chatName">Chat Name</label>
+                        <input type="text" class="form-control" id="chatName" name="Name" required />
+                    </div>
+                    <div class="form-group">
+                        <label for="chatDescription">Description</label>
+                        <textarea class="form-control" id="chatDescription" name="Description" rows="3" required></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="participantSelect">Select Participants</label>
+                        <select class="form-control" id="participantSelect" name="ParticipantIds" multiple="multiple">
+                            @foreach (var user in (List<SocialNetwork.Models.DTO.UserDTO>)ViewBag.AllUsers)
+                            {
+                                <option value="@user.Id">@user.FullName (@user.Username)</option>
+                            }
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/main.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0/dist/js/select2.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('#participantSelect').select2({
+                width: '100%',
+                placeholder: 'Select Participants'
+            });
+
+            $('#createChatForm').submit(function (event) {
+                event.preventDefault();
+                $.ajax({
+                    url: '/Chats/Create',
+                    type: 'POST',
+                    data: $(this).serialize(),
+                    success: function (response) {
+                        if (response.success) {
+                            $('#createChatModal').modal('hide');
+                            location.reload(); // Refresh the page to show the new chat
+                        } else {
+                            alert('Error creating chat: ' + response.error);
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+}

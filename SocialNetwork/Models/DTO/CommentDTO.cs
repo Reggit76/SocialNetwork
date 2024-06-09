@@ -7,6 +7,8 @@
         public int UserId { get; set; }
         public string Content { get; set; } = null!;
         public DateTime DatePosted { get; set; }
+        public string UserFullName { get; set; } = null!;
+        public string? UserProfilePictureUrl { get; set; }
         public List<CommentDTO> Replies { get; set; } = new List<CommentDTO>();
     }
 }

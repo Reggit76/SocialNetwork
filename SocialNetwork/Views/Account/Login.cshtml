@@ -3,25 +3,51 @@
 @{
     ViewData["Title"] = "Login";
 }
-@Html.Partial("_Header")
-<div class="main-content">
+
+<div class="login-container">
     <h2>Login</h2>
     <form asp-action="Login" method="post">
         <div class="form-group">
-            <label asp-for="Email"></label>
+            <label asp-for="Email" class="control-label"></label>
             <input asp-for="Email" class="form-control" />
             <span asp-validation-for="Email" class="text-danger"></span>
         </div>
         <div class="form-group">
-            <label asp-for="Password"></label>
-            <input asp-for="Password" class="form-control" />
+            <label asp-for="Password" class="control-label"></label>
+            <div class="input-group">
+                <input asp-for="Password" class="form-control" id="loginPassword" />
+                <div class="input-group-append">
+                    <button type="button" class="btn btn-outline-secondary" onclick="togglePassword('loginPassword', 'toggleLoginPasswordBtn')">
+                        <i id="toggleLoginPasswordBtn" class="fa fa-eye"></i>
+                    </button>
+                </div>
+            </div>
             <span asp-validation-for="Password" class="text-danger"></span>
         </div>
         <div class="form-group form-check">
             <input asp-for="RememberMe" class="form-check-input" />
             <label asp-for="RememberMe" class="form-check-label"></label>
         </div>
-        <button type="submit" class="btn btn-primary">Login</button>
+        <div class="form-group">
+            <button type="submit" class="btn btn-primary">Login</button>
+        </div>
     </form>
 </div>
-@Html.Partial("_Footer")
+
+@section Scripts {
+    <script>
+        function togglePassword(inputId, btnId) {
+            var input = document.getElementById(inputId);
+            var btn = document.getElementById(btnId);
+            if (input.type === "password") {
+                input.type = "text";
+                btn.classList.remove("fa-eye");
+                btn.classList.add("fa-eye-slash");
+            } else {
+                input.type = "password";
+                btn.classList.remove("fa-eye-slash");
+                btn.classList.add("fa-eye");
+            }
+        }
+    </script>
+}

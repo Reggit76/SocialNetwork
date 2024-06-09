@@ -1,17 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Security.Cryptography;
-using System.Text;
+using System.Security.Claims;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Data;
-using SocialNetwork.Models;
 using SocialNetwork.Services.Interfaces;
 using SocialNetwork.Models.ViewModels;
+using SocialNetwork.Models;
 
 namespace SocialNetwork.Services
 {
@@ -24,10 +23,20 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public async Task<int> GetUserIdAsync(string email)
+        public async Task<int> GetUserIdAsync(string username)
         {
-            var user = await _context.Users.SingleOrDefaultAsync(u => u.Email == email);
+            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
             return user?.Id ?? 0;
+        }
+
+        public async Task<int> GetUserIdFromClaimsAsync(ClaimsPrincipal user)
+        {
+            var userIdClaim = user.FindFirst("UserId");
+            if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
+            {
+                return userId;
+            }
+            return 0;
         }
 
         public async Task<bool> RegisterUserAsync(RegisterViewModel model)
@@ -150,12 +159,15 @@ namespace SocialNetwork.Services
             return null;
         }
 
-        public async Task<UserDTO> GetUserProfileAsync(int userId)
+        public async Task<UserDTO> GetUserProfileAsync(int id)
         {
-            var user = await _context.Users.FindAsync(userId);
+            var user = await _context.Users
+                .Include(u => u.Posts)
+                .FirstOrDefaultAsync(u => u.Id == id);
+
             if (user == null) return null;
 
-            return new UserDTO
+            var userDto = new UserDTO
             {
                 Id = user.Id,
                 FullName = user.FullName,
@@ -165,8 +177,16 @@ namespace SocialNetwork.Services
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 Role = user.Role,
                 Username = user.Username,
-                IsBanned = user.IsBanned
+                IsBanned = user.IsBanned,
+                Posts = user.Posts.Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted
+                }).ToList()
             };
+
+            return userDto;
         }
 
         public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
@@ -184,21 +204,27 @@ namespace SocialNetwork.Services
                 }).ToListAsync();
         }
 
-        public async Task<bool> UpdateUserProfileAsync(UserDTO User)
+        public async Task<bool> UpdateUserProfileAsync(UserDTO userDto)
         {
-            var user = await _context.Users.FindAsync(User.Id);
+            var user = await _context.Users.FindAsync(userDto.Id);
             if (user == null)
             {
                 return false;
             }
 
-            user.FullName = User.FullName;
-            user.Gender = User.Gender;
-            user.DateOfBirth = User.DateOfBirth;
-            user.ProfilePictureUrl = User.ProfilePictureUrl;
-            user.Email = User.Email;
-            user.Username = User.Username;
-            user.IsBanned = User.IsBanned;
+            // Проверка на существование электронной почты и имени пользователя, исключая текущего пользователя
+            if (await _context.Users.AnyAsync(u => (u.Email == userDto.Email || u.Username == userDto.Username) && u.Id != userDto.Id))
+            {
+                return false; // Email или Username уже существуют для другого пользователя
+            }
+
+            user.FullName = userDto.FullName;
+            user.Gender = userDto.Gender;
+            user.DateOfBirth = userDto.DateOfBirth;
+            user.ProfilePictureUrl = userDto.ProfilePictureUrl;
+            user.Email = userDto.Email;
+            user.Username = userDto.Username;
+            user.IsBanned = userDto.IsBanned;
 
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
@@ -348,6 +374,35 @@ namespace SocialNetwork.Services
                 return _context.Entry(user).Property("PasswordHash").CurrentValue as string;
             }
             return null;
+        }
+
+        public async Task<string> GetUserRoleAsync(string username)
+        {
+            var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
+            if (user != null)
+            {
+                return user.Role.ToString();
+            }
+            return null;
+        }
+
+        public async Task<List<UserDTO>> GetAllUsersExceptFriendsAsync(int userId, List<int> friendIds)
+        {
+            return await _context.Users
+                .Where(u => u.Id != userId && !friendIds.Contains(u.Id))
+                .Select(u => new UserDTO
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    Gender = u.Gender,
+                    DateOfBirth = u.DateOfBirth,
+                    ProfilePictureUrl = u.ProfilePictureUrl,
+                    Role = u.Role,
+                    Username = u.Username,
+                    IsBanned = u.IsBanned,
+                    Description = u.Description
+                }).ToListAsync();
         }
     }
 }

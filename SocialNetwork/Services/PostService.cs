@@ -31,7 +31,23 @@ namespace SocialNetwork.Services
                     Content = p.Content,
                     DatePosted = p.DatePosted,
                     LikesCount = p.LikesCount,
-                    ImageUrl = p.ImageUrl
+                    ImageUrl = p.ImageUrl,
+                    AuthorProfile = new UserDTO
+                    {
+                        Id = p.Author.Id,
+                        FullName = p.Author.FullName,
+                        ProfilePictureUrl = p.Author.ProfilePictureUrl
+                    },
+                    Comments = p.Comments.Select(c => new CommentDTO
+                    {
+                        Id = c.Id,
+                        PostId = c.PostId,
+                        UserId = c.UserId,
+                        Content = c.Content,
+                        DatePosted = c.DatePosted,
+                        UserFullName = c.User.FullName,
+                        UserProfilePictureUrl = c.User.ProfilePictureUrl
+                    }).ToList()
                 })
                 .ToListAsync();
         }
@@ -52,7 +68,23 @@ namespace SocialNetwork.Services
                 Content = post.Content,
                 DatePosted = post.DatePosted,
                 LikesCount = post.LikesCount,
-                ImageUrl = post.ImageUrl
+                ImageUrl = post.ImageUrl,
+                AuthorProfile = new UserDTO
+                {
+                    Id = post.Author.Id,
+                    FullName = post.Author.FullName,
+                    ProfilePictureUrl = post.Author.ProfilePictureUrl
+                },
+                Comments = post.Comments.Select(c => new CommentDTO
+                {
+                    Id = c.Id,
+                    PostId = c.PostId,
+                    UserId = c.UserId,
+                    Content = c.Content,
+                    DatePosted = c.DatePosted,
+                    UserFullName = c.User.FullName,
+                    UserProfilePictureUrl = c.User.ProfilePictureUrl
+                }).ToList()
             };
         }
 
@@ -95,38 +127,28 @@ namespace SocialNetwork.Services
             }
         }
 
-        public async Task AddCommentAsync(CommentDTO commentDTO)
+        public async Task<bool> LikePostAsync(int postId)
         {
-            commentDTO.DatePosted = DateTime.UtcNow;
-            var comment = new Comment
+            var post = await _context.Posts.FindAsync(postId);
+            if (post != null)
             {
-                PostId = commentDTO.PostId,
-                UserId = commentDTO.UserId,
-                Content = commentDTO.Content,
-                DatePosted = commentDTO.DatePosted
-            };
-            await _context.Comments.AddAsync(comment);
-            await _context.SaveChangesAsync();
+                post.LikesCount++;
+                await _context.SaveChangesAsync();
+                return true;
+            }
+            return false;
         }
 
-        public async Task UpdateCommentAsync(CommentDTO commentDTO)
+        public async Task<bool> DislikePostAsync(int postId)
         {
-            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentDTO.Id);
-            if (comment != null)
+            var post = await _context.Posts.FindAsync(postId);
+            if (post != null)
             {
-                comment.Content = commentDTO.Content;
+                post.LikesCount--;
                 await _context.SaveChangesAsync();
+                return true;
             }
-        }
-
-        public async Task DeleteCommentAsync(int commentId)
-        {
-            var comment = await _context.Comments.FirstOrDefaultAsync(c => c.Id == commentId);
-            if (comment != null)
-            {
-                _context.Comments.Remove(comment);
-                await _context.SaveChangesAsync();
-            }
+            return false;
         }
 
         public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
@@ -134,6 +156,7 @@ namespace SocialNetwork.Services
             return await _context.Posts
                 .Where(p => p.UserId == userId)
                 .Include(p => p.Author)
+                .Include(p => p.Comments)
                 .Select(p => new PostDTO
                 {
                     Id = p.Id,
@@ -141,7 +164,62 @@ namespace SocialNetwork.Services
                     Content = p.Content,
                     DatePosted = p.DatePosted,
                     LikesCount = p.LikesCount,
-                    ImageUrl = p.ImageUrl
+                    ImageUrl = p.ImageUrl,
+                    AuthorProfile = new UserDTO
+                    {
+                        Id = p.Author.Id,
+                        FullName = p.Author.FullName,
+                        ProfilePictureUrl = p.Author.ProfilePictureUrl
+                    },
+                    Comments = p.Comments.Select(c => new CommentDTO
+                    {
+                        Id = c.Id,
+                        PostId = c.PostId,
+                        UserId = c.UserId,
+                        Content = c.Content,
+                        DatePosted = c.DatePosted,
+                        UserFullName = c.User.FullName,
+                        UserProfilePictureUrl = c.User.ProfilePictureUrl
+                    }).ToList()
+                })
+                .ToListAsync();
+        }
+
+        public async Task<IEnumerable<PostDTO>> GetFriendsPostsAsync(int userId)
+        {
+            var friendIds = await _context.Friendships
+                .Where(f => f.UserId == userId)
+                .Select(f => f.FriendId)
+                .ToListAsync();
+
+            return await _context.Posts
+                .Where(p => friendIds.Contains(p.UserId))
+                .Include(p => p.Author)
+                .Include(p => p.Comments)
+                .Select(p => new PostDTO
+                {
+                    Id = p.Id,
+                    UserId = p.UserId,
+                    Content = p.Content,
+                    DatePosted = p.DatePosted,
+                    LikesCount = p.LikesCount,
+                    ImageUrl = p.ImageUrl,
+                    AuthorProfile = new UserDTO
+                    {
+                        Id = p.Author.Id,
+                        FullName = p.Author.FullName,
+                        ProfilePictureUrl = p.Author.ProfilePictureUrl
+                    },
+                    Comments = p.Comments.Select(c => new CommentDTO
+                    {
+                        Id = c.Id,
+                        PostId = c.PostId,
+                        UserId = c.UserId,
+                        Content = c.Content,
+                        DatePosted = c.DatePosted,
+                        UserFullName = c.User.FullName,
+                        UserProfilePictureUrl = c.User.ProfilePictureUrl
+                    }).ToList()
                 })
                 .ToListAsync();
         }

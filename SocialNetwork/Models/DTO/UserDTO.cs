@@ -1,4 +1,6 @@
-﻿namespace SocialNetwork.Models.DTO
+﻿using SocialNetwork.Models.Entity;
+
+namespace SocialNetwork.Models.DTO
 {
     public class UserDTO
     {
@@ -12,5 +14,8 @@
         public string Description { get; set; }
         public Role Role { get; set; }
         public bool IsBanned { get; set; }
+
+        public virtual ICollection<PostDTO> Posts { get; set; } = new List<PostDTO>();
+        public virtual ICollection<FriendshipDTO> Friendships { get; set; } = new List<FriendshipDTO>();
     }
 }

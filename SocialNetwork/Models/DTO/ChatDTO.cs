@@ -5,7 +5,7 @@
         public int Id { get; set; }
         public string Name { get; set; } = null!;
         public string Description { get; set; } = null!;
-        public List<MessageDTO> Messages { get; set; } = new List<MessageDTO>();
         public List<UserDTO> Participants { get; set; } = new List<UserDTO>();
+        public List<MessageDTO> Messages { get; set; } = new List<MessageDTO>();
     }
 }

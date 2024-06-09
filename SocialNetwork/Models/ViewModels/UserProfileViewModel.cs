@@ -10,7 +10,7 @@ namespace SocialNetwork.Models.ViewModels
 
         [Required]
         [StringLength(100, ErrorMessage = "Full name cannot be longer than 100 characters.")]
-        public string FullName { get; set; }
+        public string FullName { get; set; } = string.Empty;
 
         [Required]
         public Gender Gender { get; set; }
@@ -25,11 +25,11 @@ namespace SocialNetwork.Models.ViewModels
         [Required]
         public Role Role { get; set; }
 
-        public string Description { get; set; }
+        public string Description { get; set; } = string.Empty;
 
-        public string Username { get; set; }
+        public string Username { get; set; } = string.Empty;
 
-        public string Email { get; set; }
+        public string Email { get; set; } = string.Empty;
 
 
         public List<PostDTO> Posts { get; set; } = new List<PostDTO>();

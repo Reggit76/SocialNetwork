@@ -1,10 +1,10 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Services.Interfaces;
 using System.Linq;
-using System.Threading.Tasks;
+using SocialNetwork.Models.DTO;
 
 namespace SocialNetwork.Controllers
 {
@@ -20,11 +20,17 @@ namespace SocialNetwork.Controllers
             _postService = postService;
         }
 
-        public async Task<IActionResult> Index()
+        public async Task<IActionResult> Index(int? id)
         {
-            var userId = await _userService.GetUserIdAsync(User.Identity.Name);
+            int userId = id ?? await _userService.GetUserIdFromClaimsAsync(User);
             var user = await _userService.GetUserProfileAsync(userId);
-            var posts = (await _postService.GetUserPostsAsync(userId)).ToList();
+
+            if (user == null)
+            {
+                return NotFound("User not found");
+            }
+
+            var posts = await _postService.GetUserPostsAsync(userId);
 
             var model = new UserProfileViewModel
             {
@@ -34,20 +40,20 @@ namespace SocialNetwork.Controllers
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 Gender = user.Gender,
                 Role = user.Role,
-                Posts = posts
+                Posts = posts.ToList()
             };
 
             return View(model);
         }
 
-        [HttpGet]
-        public async Task<IActionResult> EditProfile(int userId)
+        public async Task<IActionResult> Edit()
         {
+            var userId = await _userService.GetUserIdFromClaimsAsync(User);
             var user = await _userService.GetUserProfileAsync(userId);
 
             if (user == null)
             {
-                return NotFound(); // Или любой другой обработчик ошибок
+                return NotFound("User not found");
             }
 
             var model = new EditProfileViewModel
@@ -57,36 +63,36 @@ namespace SocialNetwork.Controllers
                 DateOfBirth = user.DateOfBirth,
                 ProfilePictureUrl = user.ProfilePictureUrl,
                 Gender = user.Gender,
-                Role = user.Role,
-                Username = user.Username,
                 Email = user.Email,
-                AvatarUrl = user.ProfilePictureUrl,
-                Description = user.Description
+                Username = user.Username
             };
 
             return View(model);
         }
 
         [HttpPost]
-        public async Task<IActionResult> EditProfile(EditProfileViewModel model)
+        public async Task<IActionResult> Edit(EditProfileViewModel model)
         {
             if (ModelState.IsValid)
             {
-                var userDTO = new UserDTO
+                var userDto = new UserDTO
                 {
                     Id = model.Id,
                     FullName = model.FullName,
                     DateOfBirth = model.DateOfBirth,
                     ProfilePictureUrl = model.ProfilePictureUrl,
                     Gender = model.Gender,
-                    Role = model.Role,
-                    Username = model.Username,
                     Email = model.Email,
-                    Description = model.Description
+                    Username = model.Username
                 };
 
-                await _userService.UpdateUserProfileAsync(userDTO);
-                return RedirectToAction("Index");
+                var result = await _userService.UpdateUserProfileAsync(userDto);
+                if (result)
+                {
+                    return RedirectToAction(nameof(Index), new { id = model.Id });
+                }
+
+                ModelState.AddModelError(string.Empty, "An error occurred while updating the profile.");
             }
 
             return View(model);

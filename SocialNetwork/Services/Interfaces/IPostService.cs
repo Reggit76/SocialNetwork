@@ -11,9 +11,9 @@ namespace SocialNetwork.Services.Interfaces
         Task CreatePostAsync(PostDTO postDTO);
         Task UpdatePostAsync(PostDTO postDTO);
         Task DeletePostAsync(int id);
-        Task AddCommentAsync(CommentDTO commentDTO);
-        Task UpdateCommentAsync(CommentDTO commentDTO);
-        Task DeleteCommentAsync(int commentId);
+        Task<bool> LikePostAsync(int postId);
+        Task<bool> DislikePostAsync(int postId);
         Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId);
+        Task<IEnumerable<PostDTO>> GetFriendsPostsAsync(int userId);
     }
 }

@@ -22,9 +22,17 @@ namespace SocialNetwork.Services
 
         public async Task<bool> SendFriendRequestAsync(int userId, int friendId)
         {
+            var user = await _context.Users.FindAsync(userId);
+            var friend = await _context.Users.FindAsync(friendId);
+
+            if (user == null || friend == null)
+            {
+                throw new InvalidOperationException("User or Friend not found");
+            }
+
             if (await _context.Friendships.AnyAsync(f => (f.UserId == userId && f.FriendId == friendId) || (f.UserId == friendId && f.FriendId == userId)))
             {
-                return false; // Дружба уже существует или запрос уже отправлен
+                return false; 
             }
 
             var friendship = new Friendship
@@ -39,6 +47,7 @@ namespace SocialNetwork.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
 
         public async Task<bool> AcceptFriendRequestAsync(int userId, int friendId)
         {
@@ -79,22 +88,30 @@ namespace SocialNetwork.Services
 
         public async Task<List<UserDTO>> GetFriendsAsync(int userId)
         {
-            return await _context.Friendships
-                .Where(f => f.UserId == userId && f.Status == FriendshipStatus.Accepted)
-                .Select(f => new UserDTO
-                {
-                    Id = f.Friend.Id,
-                    FullName = f.Friend.FullName,
-                    Email = f.Friend.Email,
-                    Gender = f.Friend.Gender,
-                    DateOfBirth = f.Friend.DateOfBirth,
-                    ProfilePictureUrl = f.Friend.ProfilePictureUrl,
-                    Role = f.Friend.Role,
-                    Username = f.Friend.Username,
-                    IsBanned = f.Friend.IsBanned
-                })
+            var friendships = await _context.Friendships
+                .Where(f => (f.UserId == userId && f.Status == FriendshipStatus.Accepted)
+                            || (f.FriendId == userId && f.Status == FriendshipStatus.Accepted))
                 .ToListAsync();
+
+            var friendIds = friendships.Select(f => f.UserId == userId ? f.FriendId : f.UserId).Distinct().ToList();
+
+            return await _context.Users
+                .Where(u => friendIds.Contains(u.Id))
+                .Select(u => new UserDTO
+                {
+                    Id = u.Id,
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    Gender = u.Gender,
+                    DateOfBirth = u.DateOfBirth,
+                    ProfilePictureUrl = u.ProfilePictureUrl,
+                    Role = u.Role,
+                    Username = u.Username,
+                    IsBanned = u.IsBanned,
+                    Description = u.Description // Assuming there is a description field
+                }).ToListAsync();
         }
+
 
         public async Task<List<UserDTO>> GetPendingRequestsAsync(int userId)
         {

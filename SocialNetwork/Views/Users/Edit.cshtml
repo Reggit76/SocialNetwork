@@ -3,10 +3,10 @@
 @{
     ViewData["Title"] = "Edit User";
 }
-@Html.Partial("_Header")
+
 <div class="main-content">
-    <h2>Edit User</h2>
-    <form asp-action="Edit" method="post">
+    <h2 class="text-center">Edit User</h2>
+    <form asp-action="Edit" method="post" class="mx-auto" style="max-width: 600px;">
         <input type="hidden" asp-for="Id" />
         <div class="form-group">
             <label asp-for="Username"></label>
@@ -43,16 +43,18 @@
             <input asp-for="ProfilePictureUrl" class="form-control" />
             <span asp-validation-for="ProfilePictureUrl" class="text-danger"></span>
         </div>
-        <div class="form-group">
-            <label asp-for="Role"></label>
-            <select asp-for="Role" class="form-control">
-                <option value="RegularUser">Regular User</option>
-                <option value="Moderator">Moderator</option>
-                <option value="Administrator">Administrator</option>
-            </select>
-            <span asp-validation-for="Role" class="text-danger"></span>
-        </div>
+        @if (User.IsInRole("Administrator"))
+        {
+            <div class="form-group">
+                <label asp-for="Role"></label>
+                <select asp-for="Role" class="form-control">
+                    <option value="RegularUser">Regular User</option>
+                    <option value="Moderator">Moderator</option>
+                    <option value="Administrator">Administrator</option>
+                </select>
+                <span asp-validation-for="Role" class="text-danger"></span>
+            </div>
+        }
         <button type="submit" class="btn btn-primary">Save</button>
     </form>
 </div>
-@Html.Partial("_Footer")
