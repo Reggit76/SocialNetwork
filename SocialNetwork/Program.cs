@@ -3,15 +3,16 @@ using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
 using SocialNetwork.Services;
 using SocialNetwork.Services.Interfaces;
-using SocialNetwork.Hubs;
 using SocialNetwork.Models.Entity;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Models;
+using Microsoft.Extensions.Logging;
+using SocialNetwork.Hubs;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-ConfigureServices(builder.Services, builder.Configuration);
+ConfigureServices(builder.Services, builder.Configuration, builder.Logging);
 
 var app = builder.Build();
 
@@ -20,10 +21,9 @@ Configure(app, app.Environment);
 
 app.Run();
 
-void ConfigureServices(IServiceCollection services, IConfiguration configuration)
+void ConfigureServices(IServiceCollection services, IConfiguration configuration, ILoggingBuilder logging)
 {
     services.AddControllersWithViews();
-    services.AddSignalR();
 
     services.AddDbContext<ApplicationDbContext>(options =>
         options.UseNpgsql(configuration.GetConnectionString("DefaultConnection"),
@@ -47,6 +47,11 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
         });
 
     services.AddHttpContextAccessor();
+    services.AddSignalR();
+
+    logging.ClearProviders();
+    logging.AddConsole();
+    logging.AddDebug();
 }
 
 void Configure(WebApplication app, IWebHostEnvironment env)
@@ -66,13 +71,10 @@ void Configure(WebApplication app, IWebHostEnvironment env)
     app.UseBanCheck();
     app.UseAuthorization();
 
-    app.UseEndpoints(endpoints =>
-    {
-        endpoints.MapControllerRoute(
-            name: "default",
-            pattern: "{controller=Home}/{action=Index}/{id?}");
-        endpoints.MapHub<ChatHub>("/chathub");
-    });
+    app.MapControllerRoute(
+        name: "default",
+        pattern: "{controller=Home}/{action=Index}/{id?}");
+    app.MapHub<ChatHub>("/chathub");
 
     EnsureDatabaseCreated(app.Services).Wait();
 }
@@ -119,7 +121,6 @@ async Task CreateAdminUserAsync(IServiceProvider serviceProvider)
         }
     }
 }
-
 
 // Extension method used to add the middleware to the HTTP request pipeline.
 public static class BanCheckMiddlewareExtensions

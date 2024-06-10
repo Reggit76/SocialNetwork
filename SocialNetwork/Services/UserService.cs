@@ -11,20 +11,24 @@ using SocialNetwork.Data;
 using SocialNetwork.Services.Interfaces;
 using SocialNetwork.Models.ViewModels;
 using SocialNetwork.Models;
+using Microsoft.Extensions.Logging;
 
 namespace SocialNetwork.Services
 {
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
+        private readonly ILogger<UserService> _logger;
 
-        public UserService(ApplicationDbContext context)
+        public UserService(ApplicationDbContext context, ILogger<UserService> logger)
         {
             _context = context;
+            _logger = logger;
         }
 
         public async Task<int> GetUserIdAsync(string username)
         {
+            _logger.LogInformation("Retrieving user ID for username {username}.", username);
             var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
             return user?.Id ?? 0;
         }
@@ -34,8 +38,10 @@ namespace SocialNetwork.Services
             var userIdClaim = user.FindFirst("UserId");
             if (userIdClaim != null && int.TryParse(userIdClaim.Value, out int userId))
             {
+                _logger.LogInformation("User ID {userId} retrieved from claims.", userId);
                 return userId;
             }
+            _logger.LogWarning("User ID claim not found or invalid.");
             return 0;
         }
 
@@ -43,11 +49,13 @@ namespace SocialNetwork.Services
         {
             if (await _context.Users.AnyAsync(u => u.Username == model.Username || u.Email == model.Email))
             {
+                _logger.LogWarning("Username or email already exists for username {username}, email {email}.", model.Username, model.Email);
                 return false;
             }
 
             if (!IsValidPassword(model.Password))
             {
+                _logger.LogWarning("Invalid password for username {username}.", model.Username);
                 throw new ArgumentException("Password does not meet the required criteria.");
             }
 
@@ -68,6 +76,7 @@ namespace SocialNetwork.Services
             var passwordHash = HashPassword(model.Password);
             SavePasswordHash(user.Id, passwordHash);
 
+            _logger.LogInformation("User {username} registered successfully.", model.Username);
             return true;
         }
 
@@ -75,11 +84,13 @@ namespace SocialNetwork.Services
         {
             if (await _context.Users.AnyAsync(u => u.Username == username || u.Email == email))
             {
+                _logger.LogWarning("Username or email already exists for username {username}, email {email}.", username, email);
                 return false;
             }
 
             if (!IsValidPassword(password))
             {
+                _logger.LogWarning("Invalid password for username {username}.", username);
                 throw new ArgumentException("Password does not meet the required criteria.");
             }
 
@@ -96,6 +107,7 @@ namespace SocialNetwork.Services
             var passwordHash = HashPassword(password);
             SavePasswordHash(user.Id, passwordHash);
 
+            _logger.LogInformation("Admin user {username} registered successfully.", username);
             return true;
         }
 
@@ -103,6 +115,7 @@ namespace SocialNetwork.Services
         {
             if (string.IsNullOrWhiteSpace(searchTerm))
             {
+                _logger.LogInformation("Retrieving all users.");
                 return await _context.Users
                     .Select(u => new UserDTO
                     {
@@ -117,6 +130,8 @@ namespace SocialNetwork.Services
                         IsBanned = u.IsBanned
                     }).ToListAsync();
             }
+
+            _logger.LogInformation("Searching users with term {searchTerm}.", searchTerm);
             return await _context.Users
                 .Where(u => u.FullName.Contains(searchTerm) || u.Username.Contains(searchTerm))
                 .Select(u => new UserDTO
@@ -135,12 +150,14 @@ namespace SocialNetwork.Services
 
         public async Task<UserDTO> AuthenticateUserAsync(string email, string password)
         {
+            _logger.LogInformation("Authenticating user with email {email}.", email);
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
             if (user != null)
             {
                 var storedPasswordHash = GetPasswordHash(user.Id);
                 if (VerifyPassword(password, storedPasswordHash))
                 {
+                    _logger.LogInformation("User with email {email} authenticated successfully.", email);
                     return new UserDTO
                     {
                         Id = user.Id,
@@ -155,17 +172,22 @@ namespace SocialNetwork.Services
                     };
                 }
             }
-
+            _logger.LogWarning("Authentication failed for email {email}.", email);
             return null;
         }
 
         public async Task<UserDTO> GetUserProfileAsync(int id)
         {
+            _logger.LogInformation("Retrieving profile for user ID {userId}.", id);
             var user = await _context.Users
                 .Include(u => u.Posts)
                 .FirstOrDefaultAsync(u => u.Id == id);
 
-            if (user == null) return null;
+            if (user == null)
+            {
+                _logger.LogWarning("User with ID {userId} not found.", id);
+                return null;
+            }
 
             var userDto = new UserDTO
             {
@@ -186,11 +208,13 @@ namespace SocialNetwork.Services
                 }).ToList()
             };
 
+            _logger.LogInformation("Profile for user ID {userId} retrieved successfully.", id);
             return userDto;
         }
 
         public async Task<IEnumerable<PostDTO>> GetUserPostsAsync(int userId)
         {
+            _logger.LogInformation("Retrieving posts for user ID {userId}.", userId);
             return await _context.Posts
                 .Where(p => p.UserId == userId)
                 .Select(p => new PostDTO
@@ -206,16 +230,18 @@ namespace SocialNetwork.Services
 
         public async Task<bool> UpdateUserProfileAsync(UserDTO userDto)
         {
+            _logger.LogInformation("Updating profile for user ID {userId}.", userDto.Id);
             var user = await _context.Users.FindAsync(userDto.Id);
             if (user == null)
             {
+                _logger.LogWarning("User with ID {userId} not found.", userDto.Id);
                 return false;
             }
 
-            // Проверка на существование электронной почты и имени пользователя, исключая текущего пользователя
             if (await _context.Users.AnyAsync(u => (u.Email == userDto.Email || u.Username == userDto.Username) && u.Id != userDto.Id))
             {
-                return false; // Email или Username уже существуют для другого пользователя
+                _logger.LogWarning("Email or username already exists for another user (ID {userId}).", userDto.Id);
+                return false; 
             }
 
             user.FullName = userDto.FullName;
@@ -229,11 +255,13 @@ namespace SocialNetwork.Services
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
+            _logger.LogInformation("Profile for user ID {userId} updated successfully.", userDto.Id);
             return true;
         }
 
         public async Task<List<UserDTO>> GetAllUsersAsync()
         {
+            _logger.LogInformation("Retrieving all users.");
             return await _context.Users.Select(u => new UserDTO
             {
                 Id = u.Id,
@@ -250,13 +278,16 @@ namespace SocialNetwork.Services
 
         public async Task<bool> CreateUserAsync(UserDTO User, string password)
         {
+            _logger.LogInformation("Creating user {username}.", User.Username);
             if (await _context.Users.AnyAsync(u => u.Username == User.Username || u.Email == User.Email))
             {
+                _logger.LogWarning("Username or email already exists for username {username}, email {email}.", User.Username, User.Email);
                 return false;
             }
 
             if (!IsValidPassword(password))
             {
+                _logger.LogWarning("Invalid password for username {username}.", User.Username);
                 throw new ArgumentException("Password does not meet the required criteria.");
             }
 
@@ -277,6 +308,7 @@ namespace SocialNetwork.Services
             var passwordHash = HashPassword(password);
             SavePasswordHash(user.Id, passwordHash);
 
+            _logger.LogInformation("User {username} created successfully.", User.Username);
             return true;
         }
 
@@ -297,9 +329,11 @@ namespace SocialNetwork.Services
 
         public async Task<bool> BanUserAsync(int userId)
         {
+            _logger.LogInformation("Banning user with ID {userId}.", userId);
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
+                _logger.LogWarning("User with ID {userId} not found.", userId);
                 return false;
             }
 
@@ -307,14 +341,17 @@ namespace SocialNetwork.Services
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
+            _logger.LogInformation("User with ID {userId} banned.", userId);
             return true;
         }
 
         public async Task<bool> UnbanUserAsync(int userId)
         {
+            _logger.LogInformation("Unbanning user with ID {userId}.", userId);
             var user = await _context.Users.FindAsync(userId);
             if (user == null)
             {
+                _logger.LogWarning("User with ID {userId} not found.", userId);
                 return false;
             }
 
@@ -322,21 +359,7 @@ namespace SocialNetwork.Services
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
 
-            return true;
-        }
-
-        public async Task<bool> UpdateUserRoleAsync(int userId, Role newRole)
-        {
-            var user = await _context.Users.FindAsync(userId);
-            if (user == null)
-            {
-                return false;
-            }
-
-            user.Role = newRole;
-            _context.Users.Update(user);
-            await _context.SaveChangesAsync();
-
+            _logger.LogInformation("User with ID {userId} unbanned.", userId);
             return true;
         }
 
@@ -378,16 +401,19 @@ namespace SocialNetwork.Services
 
         public async Task<string> GetUserRoleAsync(string username)
         {
+            _logger.LogInformation("Retrieving role for username {username}.", username);
             var user = await _context.Users.SingleOrDefaultAsync(u => u.Username == username);
             if (user != null)
             {
                 return user.Role.ToString();
             }
+            _logger.LogWarning("User with username {username} not found.", username);
             return null;
         }
 
         public async Task<List<UserDTO>> GetAllUsersExceptFriendsAsync(int userId, List<int> friendIds)
         {
+            _logger.LogInformation("Retrieving all users except friends for user ID {userId}.", userId);
             return await _context.Users
                 .Where(u => u.Id != userId && !friendIds.Contains(u.Id))
                 .Select(u => new UserDTO
@@ -400,8 +426,7 @@ namespace SocialNetwork.Services
                     ProfilePictureUrl = u.ProfilePictureUrl,
                     Role = u.Role,
                     Username = u.Username,
-                    IsBanned = u.IsBanned,
-                    Description = u.Description
+                    IsBanned = u.IsBanned
                 }).ToListAsync();
         }
     }

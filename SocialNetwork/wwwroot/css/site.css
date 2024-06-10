@@ -23,6 +23,7 @@ body {
     align-items: flex-start;
     padding-top: 20px;
     overflow-y: auto;
+    overflow-x: hidden; /* Убираем горизонтальную прокрутку */
     height: 100vh;
 }
 
@@ -60,10 +61,10 @@ body {
     }
 
 .main-content {
-    margin-left: 240px;
+    margin-left: 120px; 
     padding: 20px;
-    flex-grow: 1;
     background-color: #ffffff;
+    overflow-x: hidden; 
 }
 
 /* Стили для формы регистрации и авторизации */
@@ -246,9 +247,10 @@ body {
     border-radius: 5px;
     padding: 20px;
     background-color: #ffffff;
-    height: 70vh;
+    height: 55vh;
     margin: 0 auto;
     overflow-y: scroll;
+    margin-right: 10%;
 }
 
 .avatar-small {
@@ -265,7 +267,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* Стили для списка друзей и пользователей */
 .friends-container {
     margin-top: 20px;
 }
@@ -312,7 +313,6 @@ body {
     margin-bottom: 20px;
 }
 
-/* Стили для комментариев */
 .comments {
     margin-top: 20px;
 }
@@ -338,7 +338,6 @@ body {
     resize: none;
 }
 
-/* Стили для чатов */
 .chat-container {
     display: flex;
     flex-direction: column;
@@ -416,20 +415,6 @@ body {
         flex-shrink: 0;
     }
 
-/* Стили для Select2 */
-.select2-container {
-    width: 100% !important;
-}
-
-.select2-selection--multiple {
-    height: auto !important;
-    min-height: 38px;
-    border: 1px solid #ced4da;
-    border-radius: 4px;
-    padding: 5px;
-}
-
-/* Navbar styles */
 .navbar .nav-link.active {
     font-weight: bold;
     color: #007bff;

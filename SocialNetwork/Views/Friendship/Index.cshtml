@@ -9,9 +9,9 @@
     <input type="text" id="searchFriends" placeholder="Search..." class="form-control mb-3" />
 
     <div class="tabs">
-        <button class="btn btn-primary" id="show-friends">Friends</button>
-        <button class="btn btn-secondary" id="show-all-users">All Users</button>
-        <button class="btn btn-success" id="show-incoming-requests">Incoming Requests</button>
+        <button class="btn btn-primary tab-button" data-target="friends-list">Friends</button>
+        <button class="btn btn-secondary tab-button" data-target="all-users-list">All Users</button>
+        <button class="btn btn-success tab-button" data-target="incoming-requests-list">Incoming Requests</button>
     </div>
 
     <div id="friends-list" class="friends-container">
@@ -20,7 +20,6 @@
             <div class="friend-item">
                 <img src="@friend.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
                 <p><a href="/Profile/Index/@friend.Id">@friend.FullName</a></p>
-                <p>@friend.Description</p>
                 <form asp-action="RemoveFriend" method="post">
                     <input type="hidden" name="id" value="@friend.Id" />
                     <button type="submit" class="btn btn-danger">Remove Friend</button>
@@ -36,7 +35,6 @@
             <div class="user-item">
                 <img src="@user.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
                 <p><a href="/Profile/Index/@user.Id">@user.FullName</a></p>
-                <p>@user.Description</p>
                 <form asp-action="SendRequest" method="post">
                     <input type="hidden" name="id" value="@user.Id" />
                     <button type="submit" class="btn btn-primary">Add Friend</button>
@@ -52,7 +50,6 @@
             <div class="request-item">
                 <img src="@request.ProfilePictureUrl" alt="Avatar" class="avatar-small" />
                 <p><a href="/Profile/Index/@request.Id">@request.FullName</a></p>
-                <p>@request.Description</p>
                 <form asp-action="AcceptRequest" method="post">
                     <input type="hidden" name="id" value="@request.Id" />
                     <button type="submit" class="btn btn-success">Accept</button>
@@ -68,22 +65,16 @@
 
 @section Scripts {
     <script>
-        document.getElementById('show-friends').addEventListener('click', function () {
-            document.getElementById('friends-list').classList.remove('d-none');
-            document.getElementById('all-users-list').classList.add('d-none');
-            document.getElementById('incoming-requests-list').classList.add('d-none');
-        });
+        $(document).ready(function () {
+            $('.tab-button').click(function () {
+                var target = $(this).data('target');
 
-        document.getElementById('show-all-users').addEventListener('click', function () {
-            document.getElementById('friends-list').classList.add('d-none');
-            document.getElementById('all-users-list').classList.remove('d-none');
-            document.getElementById('incoming-requests-list').classList.add('d-none');
-        });
+                $('.friends-container').addClass('d-none');
+                $('#' + target).removeClass('d-none');
 
-        document.getElementById('show-incoming-requests').addEventListener('click', function () {
-            document.getElementById('friends-list').classList.add('d-none');
-            document.getElementById('all-users-list').classList.add('d-none');
-            document.getElementById('incoming-requests-list').classList.remove('d-none');
+                $('.tab-button').removeClass('active');
+                $(this).addClass('active');
+            });
         });
     </script>
 }

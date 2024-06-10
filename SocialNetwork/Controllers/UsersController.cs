@@ -48,7 +48,6 @@ namespace SocialNetwork.Controllers
                 Email = user.Email,
                 Gender = user.Gender,
                 AvatarUrl = user.ProfilePictureUrl,
-                Description = user.Description,
                 FullName = user.FullName,
                 DateOfBirth = user.DateOfBirth
             };
@@ -68,7 +67,6 @@ namespace SocialNetwork.Controllers
                     Email = model.Email,
                     Gender = model.Gender,
                     ProfilePictureUrl = model.AvatarUrl,
-                    Description = model.Description,
                     FullName = model.FullName,
                     DateOfBirth = model.DateOfBirth
                 };
@@ -88,25 +86,14 @@ namespace SocialNetwork.Controllers
         [Authorize(Roles = "Administrator")]
         public async Task<IActionResult> ChangeRole(int id, string role)
         {
-            var user = await _userService.GetUserProfileAsync(id);
-            if (user == null || user.Role == Role.Administrator)
+            var success = await _userService.ChangeUserRoleAsync(id, role);
+            if (success)
             {
-                return BadRequest("Invalid user or role.");
+                return RedirectToAction("Index");
             }
-
-            if ((role == "Administrator" && User.IsInRole("Administrator") && user.Role != Role.Administrator) ||
-                (role == "Moderator" && User.IsInRole("Administrator") && user.Role != Role.Administrator) ||
-                (role == "RegularUser" && User.IsInRole("Administrator") && user.Role != Role.Administrator))
-            {
-                await _userService.ChangeUserRoleAsync(id, role);
-            }
-            else
-            {
-                return Forbid();
-            }
-
-            return RedirectToAction("Index");
+            return BadRequest("Failed to change role");
         }
+
 
         [HttpPost]
         [Authorize(Roles = "Administrator, Moderator")]
@@ -165,7 +152,6 @@ namespace SocialNetwork.Controllers
                     Gender = model.Gender,
                     DateOfBirth = model.DateOfBirth,
                     ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/Images/default-avatar.jpg" : model.ProfilePictureUrl,
-                    Description = model.Description,
                     Role = model.Role,
                     FullName = model.FullName
                 };

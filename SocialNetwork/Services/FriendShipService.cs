@@ -107,8 +107,7 @@ namespace SocialNetwork.Services
                     ProfilePictureUrl = u.ProfilePictureUrl,
                     Role = u.Role,
                     Username = u.Username,
-                    IsBanned = u.IsBanned,
-                    Description = u.Description // Assuming there is a description field
+                    IsBanned = u.IsBanned
                 }).ToListAsync();
         }
 

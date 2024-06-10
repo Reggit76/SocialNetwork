@@ -19,7 +19,6 @@ namespace SocialNetwork.Services.Interfaces
         Task<bool> RegisterUserAsAdminAsync(string Username, string email, string password, Role role);
         Task<List<UserDTO>> SearchUsersAsync(string searchTerm);
         Task<bool> UpdateUserProfileAsync(UserDTO model);
-        Task<bool> UpdateUserRoleAsync(int userId, Role newRole);
         Task<bool> ChangeUserRoleAsync(int userId, string role);
         Task<bool> BanUserAsync(int userId);
         Task<bool> UnbanUserAsync(int userId);

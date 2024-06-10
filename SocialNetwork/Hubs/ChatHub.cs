@@ -19,7 +19,7 @@ namespace SocialNetwork.Hubs
         {
             var senderId = int.Parse(Context.User.FindFirst("UserId").Value);
             var userName = Context.User.Identity.Name;
-            _messageService.SendMessage(chatId, senderId, message);
+            _messageService.SendMessageAsync(chatId, senderId, message);
             await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", userName, message);
         }
 

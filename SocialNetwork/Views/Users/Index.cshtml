@@ -15,11 +15,22 @@
                     <div class="d-flex align-items-center">
                         <img src="@user.ProfilePictureUrl" alt="Profile Picture" class="rounded-circle mr-3" style="width: 50px; height: 50px;" />
                         <div>
-                            <strong><a href="/Profile/Index/@user.Id">@user.FullName</a> (@user.Username)</strong>
+                            <strong><a href="/Profile/Index/@user.Id">@user.FullName</a> (@user.Role)</strong>
                             <p class="mb-0 text-muted">@user.Email</p>
                         </div>
                     </div>
                     <div class="d-flex align-items-center">
+                        @if (User.IsInRole("Administrator"))
+                        {
+                            <form asp-action="ChangeRole" method="post" class="d-inline">
+                                <input type="hidden" name="id" value="@user.Id" />
+                                <select name="role" class="form-control d-inline w-auto">
+                                    <option value="RegularUser" selected=@(user.Role == Role.RegularUser ? "selected" : "")>Regular User</option>
+                                    <option value="Moderator" selected=@(user.Role == Role.Moderator ? "selected" : "")>Moderator</option>
+                                </select>
+                                <button type="submit" class="btn btn-primary mr-2">Change Role</button>
+                            </form>
+                        }
                         <a href="/Users/Edit/@user.Id" class="btn btn-info mr-2">Edit</a>
                         <form asp-action="@((user.IsBanned) ? "UnbanUser" : "BanUser")" method="post" style="display:inline;">
                             <input type="hidden" name="id" value="@user.Id" />

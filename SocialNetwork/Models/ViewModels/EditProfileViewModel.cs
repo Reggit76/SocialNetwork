@@ -5,13 +5,12 @@ namespace SocialNetwork.Models.ViewModels
     public class EditProfileViewModel
     {
         public int Id { get; set; }
-        public string Username { get; set; }
-        public string Email { get; set; }
+        public string Username { get; set; } = null!;
+        public string Email { get; set; } = null!;
         public Gender Gender { get; set; }
         public string? AvatarUrl { get; set; }
-        public string Description { get; set; }
 
-        public string FullName { get; set; }
+        public string FullName { get; set; } = null!;
         [Required]
         [DataType(DataType.Date)]
         public DateTime DateOfBirth { get; set; }

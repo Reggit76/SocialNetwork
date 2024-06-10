@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using SocialNetwork.Data;
 using SocialNetwork.Models.DTO;
 using SocialNetwork.Models.Entity;
@@ -17,7 +19,7 @@ namespace SocialNetwork.Services
             _context = context;
         }
 
-        public void SendMessage(int chatId, int senderId, string content)
+        public async Task SendMessageAsync(int chatId, int senderId, string content)
         {
             var message = new Message
             {
@@ -27,13 +29,13 @@ namespace SocialNetwork.Services
                 Timestamp = DateTime.UtcNow
             };
 
-            _context.Messages.Add(message);
-            _context.SaveChanges();
+            await _context.Messages.AddAsync(message);
+            await _context.SaveChangesAsync();
         }
 
-        public List<MessageDTO> GetMessages(int chatId)
+        public async Task<List<MessageDTO>> GetMessagesAsync(int chatId)
         {
-            return _context.Messages
+            return await _context.Messages
                 .Where(m => m.ChatId == chatId)
                 .Select(m => new MessageDTO
                 {
@@ -42,7 +44,7 @@ namespace SocialNetwork.Services
                     SenderId = m.SenderId,
                     Content = m.Content,
                     Timestamp = m.Timestamp
-                }).ToList();
+                }).ToListAsync();
         }
     }
 }
