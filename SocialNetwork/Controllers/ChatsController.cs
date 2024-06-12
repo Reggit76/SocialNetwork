@@ -3,7 +3,6 @@ using SocialNetwork.Services.Interfaces;
 using SocialNetwork.Models.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using System.Threading.Tasks;
-using System.Linq;
 using Microsoft.AspNetCore.SignalR;
 using SocialNetwork.Hubs;
 using Microsoft.Extensions.Logging;
@@ -50,12 +49,15 @@ namespace SocialNetwork.Controllers
             {
                 _logger.LogInformation("Model state is valid for chat creation.");
 
-                model.ParticipantIds.Add(userId); // Add the creator as a participant
-                var success = await _chatService.CreateChatAsync(model.Name, model.Description, model.ParticipantIds);
+                model.ParticipantIds.Add(userId);
+                var chatId = await _chatService.CreateChatAsync(model.Name, model.Description, model.ParticipantIds, model.ChatIconUrl);
 
-                _logger.LogInformation("Chat creation status: {success}", success);
-
-                return Json(new { success });
+                if (chatId > 0)
+                {
+                    var chat = await _chatService.GetChatAsync(chatId);
+                    _logger.LogInformation("Chat creation status: {success}", true);
+                    return Json(new { success = true, chat });
+                }
             }
 
             _logger.LogWarning("Model state is invalid for chat creation.");
@@ -70,21 +72,25 @@ namespace SocialNetwork.Controllers
                 _logger.LogWarning("Chat with ID {chatId} not found.", id);
                 return NotFound();
             }
-            return View(chat);
+            var model = new ChatDetailViewModel
+            {
+                Chat = chat
+            };
+            return View(model);
         }
 
         [HttpPost]
-        public async Task<IActionResult> SendMessage(int chatId, string message)
+        public async Task<IActionResult> SendMessage(int chatId, string content)
         {
             var userId = await _userService.GetUserIdFromClaimsAsync(User);
             var userName = User.Identity.Name;
 
             _logger.LogInformation("User ID {userId} is sending message in chat ID {chatId}.", userId, chatId);
 
-            await _chatService.SendMessageAsync(chatId, userId, message);
-            await _chatHubContext.Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", userName, message);
+            await _chatService.SendMessageAsync(chatId, userId, content);
+            await _chatHubContext.Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", userName, content);
 
-            return Ok();
+            return Json(new { success = true });
         }
 
         public async Task<IActionResult> JoinChat(int chatId)

@@ -36,7 +36,7 @@ $(document).ready(function () {
             if (response.success) {
                 const comment = `
                     <div class="comment mb-2">
-                        <img src="${response.comment.UserProfilePictureUrl ?? '~/images/default-avatar.jpg'}" alt="Avatar" class="post-avatar-small">
+                        <img src="${response.comment.UserProfilePictureUrl ?? '~/images/default-avatar.png'}" alt="Avatar" class="post-avatar-small">
                         <strong>${response.comment.UserFullName}</strong>
                         <small>${new Date(response.comment.DatePosted).toLocaleString()}</small>
                         <p>${response.comment.Content}</p>

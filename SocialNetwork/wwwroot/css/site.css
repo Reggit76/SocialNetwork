@@ -23,7 +23,7 @@ body {
     align-items: flex-start;
     padding-top: 20px;
     overflow-y: auto;
-    overflow-x: hidden; /* ”бираем горизонтальную прокрутку */
+    overflow-x: hidden;
     height: 100vh;
 }
 
@@ -61,10 +61,10 @@ body {
     }
 
 .main-content {
-    margin-left: 120px; 
+    margin-left: 220px;
     padding: 20px;
     background-color: #ffffff;
-    overflow-x: hidden; 
+    overflow-x: hidden;
 }
 
 /* —тили дл€ формы регистрации и авторизации */
@@ -301,7 +301,7 @@ body {
     .request-item form,
     .friend-item a,
     .user-item a,
-    .request-item a {
+    request-item a {
         margin-left: 10px;
     }
 
@@ -341,7 +341,7 @@ body {
 .chat-container {
     display: flex;
     flex-direction: column;
-    padding: 20px;
+    height: 75vh;
 }
 
 .chat-header {
@@ -351,6 +351,7 @@ body {
     padding-bottom: 10px;
     border-bottom: 1px solid #dee2e6;
 }
+
 
 .chat-participants {
     display: flex;
@@ -378,6 +379,7 @@ body {
     border: 1px solid #dee2e6;
     border-radius: 5px;
     padding: 10px;
+    height: 70vh; 
 }
 
 .chat-message {
@@ -387,15 +389,19 @@ body {
     background-color: #f8f9fa;
 }
 
-    .chat-message strong {
-        color: #333;
-    }
+.send-message-form {
+    margin-top: 20px;
+}
 
-    .chat-message small {
-        display: block;
-        margin-top: 5px;
-        color: #777;
-    }
+.chat-message strong {
+    color: #333;
+}
+
+.chat-message small {
+    display: block;
+    margin-top: 5px;
+    color: #777;
+}
 
 .send-message-form {
     margin-top: 20px;
@@ -406,7 +412,7 @@ body {
         margin-bottom: 10px;
     }
 
-    .send-message-form input[type="text"] {
+    .send-message-form textarea {
         flex-grow: 1;
         margin-right: 10px;
     }

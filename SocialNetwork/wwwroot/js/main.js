@@ -1,75 +1,76 @@
-﻿// main.js
+﻿$(document).ready(function () {
+    // Обработка открытия модального окна для редактирования чата
+    $('#editChatModal').on('show.bs.modal', function (event) {
+        var button = $(event.relatedTarget);
+        var chatId = button.data('chat-id');
+        var chatName = button.data('chat-name');
+        var chatDescription = button.data('chat-description');
+        var chatIconUrl = button.data('chat-icon-url');
 
-$(document).ready(function () {
-    // Initialize Select2
-    $('#participantSelect').select2({
-        width: '100%',
-        placeholder: 'Select Participants'
+        var modal = $(this);
+        modal.find('#editChatId').val(chatId);
+        modal.find('#editChatName').val(chatName);
+        modal.find('#editChatDescription').val(chatDescription);
+        modal.find('#editChatIconUrl').val(chatIconUrl);
     });
 
-    // Submit create chat form via AJAX
-    $('#createChatForm').submit(function (event) {
+    // Обработка создания нового чата
+    $('#createChatForm').on('submit', function (event) {
         event.preventDefault();
+
+        var formData = $(this).serialize();
+
         $.ajax({
             url: '/Chats/Create',
             type: 'POST',
-            data: $(this).serialize(),
-            success: function (response) {
-                if (response.success) {
+            data: formData,
+            success: function (result) {
+                if (result.success) {
                     $('#createChatModal').modal('hide');
                     location.reload();
                 } else {
-                    alert('Error creating chat.');
+                    alert("Failed to create chat.");
                 }
             }
         });
     });
 
-    // Like post
-    $('.like-post-btn').click(function () {
-        const postId = $(this).data('post-id');
-        $.post('/News/LikePost', { postId: postId }, function (response) {
-            if (response.success) {
-                $(`#likes-count-${postId}`).text(response.newLikesCount);
-            } else {
-                alert('An error occurred while liking the post.');
-            }
-        });
-    });
-
-    // Dislike post
-    $('.dislike-post-btn').click(function () {
-        const postId = $(this).data('post-id');
-        $.post('/News/DislikePost', { postId: postId }, function (response) {
-            if (response.success) {
-                $(`#likes-count-${postId}`).text(response.newLikesCount);
-            } else {
-                alert('An error occurred while disliking the post.');
-            }
-        });
-    });
-
-    // Submit comment form via AJAX
-    $('.comment-form').submit(function (event) {
+    // Обработка сохранения изменений в чате
+    $('#editChatForm').on('submit', function (event) {
         event.preventDefault();
-        const form = $(this);
-        const postId = form.data('post-id');
-        const content = form.find('textarea[name="Content"]').val();
 
-        $.post('/News/AddComment', { postId: postId, content: content }, function (response) {
-            if (response.success) {
-                const comment = `
-                    <div class="comment mb-2">
-                        <img src="${response.comment.UserProfilePictureUrl ?? '~/images/default-avatar.jpg'}" alt="Avatar" class="post-avatar-small">
-                        <strong>${response.comment.UserFullName}</strong>
-                        <small>${new Date(response.comment.DatePosted).toLocaleString()}</small>
-                        <p>${response.comment.Content}</p>
-                    </div>`;
-                form.before(comment);
-                form.find('textarea[name="Content"]').val('');
-            } else {
-                alert('An error occurred while adding the comment.');
+        var formData = $(this).serialize();
+
+        $.ajax({
+            url: '/Chats/Edit',
+            type: 'POST',
+            data: formData,
+            success: function (result) {
+                if (result.success) {
+                    $('#editChatModal').modal('hide');
+                    location.reload();
+                } else {
+                    alert("Failed to edit chat.");
+                }
             }
         });
     });
+
+    // Обработка удаления чата
+    window.deleteChat = function (chatId) {
+        if (confirm("Are you sure you want to delete this chat?")) {
+            $.ajax({
+                url: '/Chats/Delete',
+                type: 'POST',
+                data: { id: chatId },
+                success: function (result) {
+                    if (result.success) {
+                        location.reload();
+                    } else {
+                        alert("Failed to delete chat.");
+                    }
+                }
+            });
+        }
+    }
 });

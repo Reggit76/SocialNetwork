@@ -23,7 +23,7 @@ namespace SocialNetwork.Services
             _logger = logger;
         }
 
-        public async Task<bool> CreateChatAsync(string name, string description, List<int> participantIds)
+        public async Task<int> CreateChatAsync(string name, string description, List<int> participantIds, string chatIconUrl)
         {
             _logger.LogInformation("Attempting to create chat with name: {name}, description: {description}, and participants: {participantIds}", name, description, string.Join(",", participantIds));
 
@@ -31,6 +31,7 @@ namespace SocialNetwork.Services
             {
                 Name = name,
                 Description = description,
+                ChatIconUrl = chatIconUrl,
                 Participants = participantIds.Select(id => new ChatUser { UserId = id }).ToList()
             };
 
@@ -39,7 +40,7 @@ namespace SocialNetwork.Services
             var isSuccess = result > 0;
             _logger.LogInformation("Chat creation {status}. Result: {result}", isSuccess ? "successful" : "failed", result);
 
-            return isSuccess;
+            return chat.Id;
         }
 
         public async Task<List<ChatDTO>> GetUserChatsAsync(int userId)
@@ -86,6 +87,45 @@ namespace SocialNetwork.Services
                 _logger.LogError(ex, "An error occurred while retrieving user chats.");
                 return new List<ChatDTO>();
             }
+        }
+
+        public async Task<ChatDTO> GetChatByIdAsync(int chatId)
+        {
+            var chat = await _context.Chats
+                .Include(c => c.Messages)
+                .Include(c => c.Participants)
+                .ThenInclude(cp => cp.User)
+                .FirstOrDefaultAsync(c => c.Id == chatId);
+
+            if (chat == null)
+            {
+                return null;
+            }
+
+            return new ChatDTO
+            {
+                Id = chat.Id,
+                Name = chat.Name,
+                Description = chat.Description,
+                ChatIconUrl = chat.ChatIconUrl,
+                Participants = chat.Participants.Select(p => new UserDTO
+                {
+                    Id = p.User.Id,
+                    FullName = p.User.FullName,
+                    Gender = p.User.Gender,
+                    DateOfBirth = p.User.DateOfBirth,
+                    ProfilePictureUrl = p.User.ProfilePictureUrl,
+                    Role = p.User.Role
+                }).ToList(),
+                Messages = chat.Messages.Select(m => new MessageDTO
+                {
+                    Id = m.Id,
+                    SenderId = m.SenderId,
+                    ChatId = m.ChatId,
+                    Content = m.Content,
+                    Timestamp = m.Timestamp
+                }).ToList()
+            };
         }
 
         public async Task<ChatDTO> GetChatAsync(int chatId)

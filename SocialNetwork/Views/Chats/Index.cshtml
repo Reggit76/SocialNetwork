@@ -11,7 +11,7 @@
     <div id="chatsList">
         @foreach (var chat in Model)
         {
-            <div class="chat-block border rounded p-3 mb-3">
+            <div class="chat-block border rounded p-3 mb-3" onclick="location.href='@Url.Action("Chat", "Chats", new { id = chat.Id })'" style="cursor: pointer;">
                 <div class="d-flex justify-content-between align-items-center">
                     <h4>@chat.Name</h4>
                     <div>
@@ -43,22 +43,22 @@
                 <form id="createChatForm">
                     <div class="form-group">
                         <label for="chatName">Chat Name</label>
-                        <input type="text" class="form-control" id="chatName" required>
+                        <input type="text" class="form-control" id="chatName" name="Name" required>
                     </div>
                     <div class="form-group">
                         <label for="chatDescription">Description</label>
-                        <textarea class="form-control" id="chatDescription" required></textarea>
+                        <textarea class="form-control" id="chatDescription" name="Description" required></textarea>
                     </div>
                     <div class="form-group">
                         <label for="chatIconUrl">Chat Icon URL</label>
-                        <input type="text" class="form-control" id="chatIconUrl">
+                        <input type="text" class="form-control" id="chatIconUrl" name="ChatIconUrl">
                     </div>
                     <div class="form-group">
                         <label for="chatParticipants">Select Participants</label>
-                        <select multiple class="form-control" id="chatParticipants">
+                        <select multiple class="form-control" id="chatParticipants" name="ParticipantIds">
                             @foreach (var user in ViewBag.AllUsers)
                             {
-                                <option value="@user.Id">@user.Username</option>
+                                <option value="@user.Id">@user.FullName</option>
                             }
                         </select>
                     </div>
@@ -81,18 +81,18 @@
             </div>
             <div class="modal-body">
                 <form id="editChatForm">
-                    <input type="hidden" id="editChatId">
+                    <input type="hidden" id="editChatId" name="Id">
                     <div class="form-group">
                         <label for="editChatName">Chat Name</label>
-                        <input type="text" class="form-control" id="editChatName" required>
+                        <input type="text" class="form-control" id="editChatName" name="Name" required>
                     </div>
                     <div class="form-group">
                         <label for="editChatDescription">Description</label>
-                        <textarea class="form-control" id="editChatDescription" required></textarea>
+                        <textarea class="form-control" id="editChatDescription" name="Description" required></textarea>
                     </div>
                     <div class="form-group">
                         <label for="editChatIconUrl">Chat Icon URL</label>
-                        <input type="text" class="form-control" id="editChatIconUrl">
+                        <input type="text" class="form-control" id="editChatIconUrl" name="ChatIconUrl">
                     </div>
                     <button type="submit" class="btn btn-primary">Save changes</button>
                 </form>
@@ -103,93 +103,81 @@
 
 @section Scripts {
     <script>
-        // Обработка открытия модального окна для редактирования чата
-        $('#editChatModal').on('show.bs.modal', function (event) {
-            var button = $(event.relatedTarget);
-            var chatId = button.data('chat-id');
-            var chatName = button.data('chat-name');
-            var chatDescription = button.data('chat-description');
-            var chatIconUrl = button.data('chat-icon-url');
+        $(document).ready(function () {
+            // Обработка открытия модального окна для редактирования чата
+            $('#editChatModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var chatId = button.data('chat-id');
+                var chatName = button.data('chat-name');
+                var chatDescription = button.data('chat-description');
+                var chatIconUrl = button.data('chat-icon-url');
 
-            var modal = $(this);
-            modal.find('#editChatId').val(chatId);
-            modal.find('#editChatName').val(chatName);
-            modal.find('#editChatDescription').val(chatDescription);
-            modal.find('#editChatIconUrl').val(chatIconUrl);
-        });
-
-        // Обработка сохранения изменений в чате
-        $('#editChatForm').on('submit', function (event) {
-            event.preventDefault();
-
-            var chatId = $('#editChatId').val();
-            var chatName = $('#editChatName').val();
-            var chatDescription = $('#editChatDescription').val();
-            var chatIconUrl = $('#editChatIconUrl').val();
-
-            $.ajax({
-                url: '@Url.Action("Edit", "Chats")',
-                type: 'POST',
-                data: {
-                    Id: chatId,
-                    Name: chatName,
-                    Description: chatDescription,
-                    ChatIconUrl: chatIconUrl
-                },
-                success: function (result) {
-                    if (result.success) {
-                        location.reload();
-                    } else {
-                        alert("Failed to edit chat");
-                    }
-                }
+                var modal = $(this);
+                modal.find('#editChatId').val(chatId);
+                modal.find('#editChatName').val(chatName);
+                modal.find('#editChatDescription').val(chatDescription);
+                modal.find('#editChatIconUrl').val(chatIconUrl);
             });
-        });
 
-        // Обработка удаления чата
-        function deleteChat(chatId) {
-            if (confirm("Are you sure you want to delete this chat?")) {
+            // Обработка создания нового чата
+            $('#createChatForm').on('submit', function (event) {
+                event.preventDefault();
+
+                var formData = $(this).serialize();
+
                 $.ajax({
-                    url: '@Url.Action("Delete", "Chats")',
+                    url: '@Url.Action("Create", "Chats")',
                     type: 'POST',
-                    data: { id: chatId },
+                    data: formData,
                     success: function (result) {
                         if (result.success) {
+                            $('#createChatModal').modal('hide');
                             location.reload();
                         } else {
-                            alert("Failed to delete chat");
+                            alert("Failed to create chat.");
                         }
                     }
                 });
-            }
-        }
-
-        // Обработка создания нового чата
-        $('#createChatForm').on('submit', function (event) {
-            event.preventDefault();
-
-            var chatName = $('#chatName').val();
-            var chatDescription = $('#chatDescription').val();
-            var chatIconUrl = $('#chatIconUrl').val();
-            var participantIds = $('#chatParticipants').val();
-
-            $.ajax({
-                url: '@Url.Action("Create", "Chats")',
-                type: 'POST',
-                data: {
-                    Name: chatName,
-                    Description: chatDescription,
-                    ChatIconUrl: chatIconUrl,
-                    ParticipantIds: participantIds
-                },
-                success: function (result) {
-                    if (result.success) {
-                        location.reload();
-                    } else {
-                        alert("Failed to create chat");
-                    }
-                }
             });
+
+            // Обработка сохранения изменений в чате
+            $('#editChatForm').on('submit', function (event) {
+                event.preventDefault();
+
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("Edit", "Chats")',
+                    type: 'POST',
+                    data: formData,
+                    success: function (result) {
+                        if (result.success) {
+                            $('#editChatModal').modal('hide');
+                            location.reload();
+                        } else {
+                            alert("Failed to edit chat.");
+                        }
+                    }
+                });
+            });
+
+            // Обработка удаления чата
+            window.deleteChat = function (chatId) {
+                if (confirm("Are you sure you want to delete this chat?")) {
+                    $.ajax({
+                        url: '@Url.Action("Delete", "Chats")',
+                        type: 'POST',
+                        data: { id: chatId },
+                        success: function (result) {
+                            if (result.success) {
+                                location.reload();
+                            } else {
+                                alert("Failed to delete chat.");
+                            }
+                        }
+                    });
+                }
+            }
         });
     </script>
 }

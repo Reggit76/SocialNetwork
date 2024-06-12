@@ -183,5 +183,24 @@ namespace SocialNetwork.Controllers
             await _commentService.AddCommentAsync(commentDTO);
             return RedirectToAction("Index");
         }
+
+        [HttpPost]
+        public async Task<IActionResult> DeleteComment(int commentId)
+        {
+            var comment = await _commentService.GetCommentByIdAsync(commentId);
+            if (comment == null)
+            {
+                return NotFound();
+            }
+
+            var userId = await _userService.GetUserIdFromClaimsAsync(User);
+            if (comment.UserId != userId && !User.IsInRole("Administrator") && !User.IsInRole("Moderator"))
+            {
+                return Forbid();
+            }
+
+            await _commentService.DeleteCommentAsync(commentId);
+            return RedirectToAction("Index");
+        }
     }
 }

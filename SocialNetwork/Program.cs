@@ -47,7 +47,7 @@ void ConfigureServices(IServiceCollection services, IConfiguration configuration
         });
 
     services.AddHttpContextAccessor();
-    services.AddSignalR();
+    services.AddSignalR();  // Добавление SignalR
 
     logging.ClearProviders();
     logging.AddConsole();
@@ -68,13 +68,14 @@ void Configure(WebApplication app, IWebHostEnvironment env)
     app.UseRouting();
 
     app.UseAuthentication();
-    app.UseBanCheck();
+    app.UseBanCheck(); 
     app.UseAuthorization();
 
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Home}/{action=Index}/{id?}");
-    app.MapHub<ChatHub>("/chathub");
+
+    app.MapHub<ChatHub>("/chathub");  // Маршрут для SignalR
 
     EnsureDatabaseCreated(app.Services).Wait();
 }

@@ -2,7 +2,7 @@
 
 <div class="post mb-4">
     <div class="post-header d-flex align-items-center">
-        <img src="@(Model.AuthorProfile?.ProfilePictureUrl ?? "~/images/default-avatar.jpg")" alt="Avatar" class="post-avatar">
+        <img src="@(Model.AuthorProfile?.ProfilePictureUrl ?? "~/images/default-avatar.png")" alt="Avatar" class="post-avatar">
         <div>
             <h5 class="m-0">@(Model.AuthorProfile?.FullName ?? "Unknown Author")</h5>
             <small>@Model.DatePosted.ToString("g")</small>
@@ -42,11 +42,20 @@
         <h6>Comments</h6>
         @foreach (var comment in Model.Comments)
         {
-            <div class="comment mb-2">
-                <img src="@(comment.UserProfilePictureUrl ?? "~/images/default-avatar.jpg")" alt="Avatar" class="post-avatar-small">
-                <strong>@comment.UserFullName</strong>
-                <small>@comment.DatePosted.ToString("g")</small>
-                <p>@comment.Content</p>
+            <div class="comment mb-2 d-flex justify-content-between align-items-start">
+                <div>
+                    <img src="@(comment.UserProfilePictureUrl ?? "~/images/default-avatar.png")" alt="Avatar" class="post-avatar-small">
+                    <strong>@comment.UserFullName</strong>
+                    <small>@comment.DatePosted.ToString("g")</small>
+                    <p>@comment.Content</p>
+                </div>
+                @if (User.FindFirst("UserId")?.Value == comment.UserId.ToString() || User.IsInRole("Administrator") || User.IsInRole("Moderator"))
+                {
+                    <form asp-action="DeleteComment" method="post" class="ml-2">
+                        <input type="hidden" name="commentId" value="@comment.Id" />
+                        <button type="submit" class="btn btn-sm btn-link text-danger">Delete</button>
+                    </form>
+                }
             </div>
         }
         <form asp-action="AddComment" method="post">

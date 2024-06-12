@@ -151,7 +151,7 @@ namespace SocialNetwork.Controllers
                     Email = model.Email,
                     Gender = model.Gender,
                     DateOfBirth = model.DateOfBirth,
-                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/Images/default-avatar.jpg" : model.ProfilePictureUrl,
+                    ProfilePictureUrl = string.IsNullOrEmpty(model.ProfilePictureUrl) ? "~/images/default-avatar.png" : model.ProfilePictureUrl,
                     Role = model.Role,
                     FullName = model.FullName
                 };

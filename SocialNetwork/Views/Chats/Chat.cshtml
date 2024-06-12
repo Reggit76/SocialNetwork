@@ -1,46 +1,52 @@
-﻿@model SocialNetwork.Models.DTO.ChatDTO
+﻿@model SocialNetwork.Models.ViewModels.ChatDetailViewModel
+
+@inject SocialNetwork.Services.Interfaces.IUserService _userService
 
 @{
-    ViewData["Title"] = Model.Name;
+    ViewData["Title"] = Model.Chat.Name;
 }
 
 <div class="chat-container">
-    <div class="chat-header">
-        <button class="btn btn-link" onclick="history.back()">
-            <i class="fas fa-arrow-left"></i>
-        </button>
-        <div>
-            <h3>@Model.Name</h3>
-            <p>@Model.Description</p>
+    <div class="chat-header d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+            <button onclick="history.back()" class="btn btn-link">
+                <i class="fa fa-arrow-left"></i>
+            </button>
+            <div>
+                <h2>@Model.Chat.Name</h2>
+                <p>@Model.Chat.Description</p>
+            </div>
         </div>
         <div>
-            <button class="btn btn-info" data-toggle="modal" data-target="#editChatModal">Edit</button>
-            <button class="btn btn-primary" data-toggle="modal" data-target="#partyChatModal">Party</button>
+            <button class="btn btn-primary" data-toggle="modal" data-target="#editChatModal" data-chat-id="@Model.Chat.Id" data-chat-name="@Model.Chat.Name" data-chat-description="@Model.Chat.Description" data-chat-icon-url="@Model.Chat.ChatIconUrl">Edit</button>
+            <button class="btn btn-secondary" data-toggle="modal" data-target="#participantsModal" data-chat-id="@Model.Chat.Id">Party</button>
         </div>
     </div>
 
-    <div class="chat-messages" id="messagesList">
-        @foreach (var message in Model.Messages)
+    <div class="chat-messages" id="chatMessages" style="height: 70vh; overflow-y: auto;">
+        @foreach (var message in Model.Chat.Messages)
         {
-            <div class="chat-message">
-                <strong>@message.SenderId</strong>
-                <small>@message.Timestamp.ToString("g")</small>
+            var userTask = _userService.GetUserProfileAsync(message.SenderId);
+            userTask.Wait();
+            var user = userTask.Result;
+            <div class="chat-message mb-2">
+                <strong>@user.FullName</strong>
                 <p>@message.Content</p>
+                <small>@message.Timestamp.ToString("g")</small>
             </div>
         }
     </div>
 
-    <div class="send-message-form">
-        <form id="sendMessageForm">
-            <div class="form-group">
-                <input type="text" id="messageInput" class="form-control" placeholder="Type a message..." />
-                <button type="submit" class="btn btn-primary"><i class="fas fa-arrow-right"></i></button>
-            </div>
-        </form>
-    </div>
+    <form id="sendMessageForm" method="post" class="send-message-form">
+        <div class="form-group d-flex">
+            <textarea id="messageContent" name="Content" class="form-control" rows="2" placeholder="Type your message here..." required></textarea>
+            <button type="submit" class="btn btn-primary ml-2">Send</button>
+        </div>
+        <input type="hidden" id="chatId" name="ChatId" value="@Model.Chat.Id" />
+    </form>
 </div>
 
-<!-- Edit Chat Modal -->
+<!-- Модальное окно для редактирования чата -->
 <div class="modal fade" id="editChatModal" tabindex="-1" role="dialog" aria-labelledby="editChatModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
@@ -52,172 +58,177 @@
             </div>
             <div class="modal-body">
                 <form id="editChatForm">
+                    <input type="hidden" id="editChatId" name="Id">
                     <div class="form-group">
                         <label for="editChatName">Chat Name</label>
-                        <input type="text" class="form-control" id="editChatName" value="@Model.Name" />
+                        <input type="text" class="form-control" id="editChatName" name="Name" required>
                     </div>
                     <div class="form-group">
                         <label for="editChatDescription">Description</label>
-                        <textarea class="form-control" id="editChatDescription">@Model.Description</textarea>
+                        <textarea class="form-control" id="editChatDescription" name="Description" required></textarea>
                     </div>
                     <div class="form-group">
                         <label for="editChatIconUrl">Chat Icon URL</label>
-                        <input type="text" class="form-control" id="editChatIconUrl" value="@Model.ChatIconUrl" />
+                        <input type="text" class="form-control" id="editChatIconUrl" name="ChatIconUrl">
                     </div>
-                    <button type="button" class="btn btn-primary" onclick="editChat(@Model.Id)">Save changes</button>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
                 </form>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Party Chat Modal -->
-<div class="modal fade" id="partyChatModal" tabindex="-1" role="dialog" aria-labelledby="partyChatModalLabel" aria-hidden="true">
+<!-- Модальное окно для списка участников -->
+<div class="modal fade" id="participantsModal" tabindex="-1" role="dialog" aria-labelledby="participantsModalLabel" aria-hidden="true">
     <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="partyChatModalLabel">Party</h5>
+                <h5 class="modal-title" id="participantsModalLabel">Participants</h5>
                 <button type="button" class="close" data-dismiss="modal" aria-label="Close">
                     <span aria-hidden="true">&times;</span>
                 </button>
             </div>
             <div class="modal-body">
                 <ul class="list-group">
-                    @foreach (var participant in Model.Participants)
+                    @foreach (var participant in Model.Chat.Participants)
                     {
-                        <li class="list-group-item">
-                            <img src="@participant.ProfilePictureUrl" alt="Profile Picture" class="avatar-small" />
-                            @participant.FullName
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <img src="@participant.ProfilePictureUrl" alt="Avatar" class="avatar-small mr-2">
+                                <span>@participant.FullName</span>
+                            </div>
+                            @if (User.IsInRole("Administrator") || User.IsInRole("Moderator"))
+                            {
+                                <button class="btn btn-danger btn-sm" onclick="removeParticipant(@Model.Chat.Id, @participant.Id)">Remove</button>
+                            }
                         </li>
                     }
                 </ul>
-                <button type="button" class="btn btn-primary mt-3" data-toggle="modal" data-target="#addParticipantModal">Invite</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Participant Modal -->
-<div class="modal fade" id="addParticipantModal" tabindex="-1" role="dialog" aria-labelledby="addParticipantModalLabel" aria-hidden="true">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="addParticipantModalLabel">Add Participant</h5>
-                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">&times;</span>
-                </button>
-            </div>
-            <div class="modal-body">
-                <form id="addParticipantForm">
-                    <div class="form-group">
-                        <label for="addParticipant">Select Participant</label>
-                        <select class="form-control" id="addParticipant" style="width: 100%;"></select>
-                    </div>
-                    <button type="button" class="btn btn-primary" onclick="addParticipant(@Model.Id)">Add</button>
-                </form>
             </div>
         </div>
     </div>
 </div>
 
 @section Scripts {
-    <script src="~/lib/microsoft/signalr/dist/browser/signalr.js"></script>
     <script>
-        const connection = new signalR.HubConnectionBuilder().withUrl("/chathub").build();
-
-        connection.on("ReceiveMessage", function (user, message) {
-            const msg = `<div class="chat-message"><strong>${user}</strong>: ${message}</div>`;
-            document.getElementById("messagesList").innerHTML += msg;
-        });
-
-        connection.start().catch(function (err) {
-            return console.error(err.toString());
-        });
-
-        document.getElementById("sendMessageForm").addEventListener("submit", function (event) {
-            event.preventDefault();
-            const messageInput = document.getElementById("messageInput");
-            const message = messageInput.value;
-            const chatId = @Model.Id;
-
-            fetch(`/Chats/SendMessage?chatId=${chatId}&message=${message}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                }
-            }).then(response => {
-                if (response.ok) {
-                    messageInput.value = '';
-                } else {
-                    alert("Failed to send message");
-                }
-            });
-        });
-
         $(document).ready(function () {
-            $('#addParticipant').select2({
-                placeholder: 'Select Participant',
-                ajax: {
-                    url: '/Users/GetUsers',
-                    dataType: 'json',
-                    processResults: function (data) {
-                        return {
-                            results: $.map(data, function (user) {
-                                return {
-                                    id: user.id,
-                                    text: user.username
-                                };
-                            })
-                        };
-                    }
-                }
+            // Обработка открытия модального окна для редактирования чата
+            $('#editChatModal').on('show.bs.modal', function (event) {
+                var button = $(event.relatedTarget);
+                var chatId = button.data('chat-id');
+                var chatName = button.data('chat-name');
+                var chatDescription = button.data('chat-description');
+                var chatIconUrl = button.data('chat-icon-url');
+
+                var modal = $(this);
+                modal.find('#editChatId').val(chatId);
+                modal.find('#editChatName').val(chatName);
+                modal.find('#editChatDescription').val(chatDescription);
+                modal.find('#editChatIconUrl').val(chatIconUrl);
             });
+
+            // Обработка создания нового чата
+            $('#createChatForm').on('submit', function (event) {
+                event.preventDefault();
+
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("Create", "Chats")',
+                    type: 'POST',
+                    data: formData,
+                    success: function (result) {
+                        if (result.success) {
+                            $('#createChatModal').modal('hide');
+                            var newChat = `
+                                                <div class="chat-block border rounded p-3 mb-3">
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <h4>${result.chat.Name}</h4>
+                                                        <div>
+                                                            <button type="button" class="btn btn-primary btn-sm" data-toggle="modal" data-target="#editChatModal" data-chat-id="${result.chat.Id}" data-chat-name="${result.chat.Name}" data-chat-description="${result.chat.Description}" data-chat-icon-url="${result.chat.ChatIconUrl}">Edit</button>
+                                                            <button type="button" class="btn btn-danger btn-sm" onclick="deleteChat(${result.chat.Id})">Delete</button>
+                                                        </div>
+                                                    </div>
+                                                    <p>${result.chat.Description}</p>
+                                                    <div class="d-flex align-items-center">
+                                                        <img src="${result.chat.ChatIconUrl}" alt="Chat Icon" class="avatar-small mr-2">
+                                                        <span>Participants: ${result.chat.Participants.length}</span>
+                                                    </div>
+                                                </div>`;
+                            $('#chatsList').prepend(newChat);
+                        } else {
+                            alert("Failed to create chat.");
+                        }
+                    }
+                });
+            });
+
+            // Обработка сохранения изменений в чате
+            $('#editChatForm').on('submit', function (event) {
+                event.preventDefault();
+
+                var formData = $(this).serialize();
+
+                $.ajax({
+                    url: '@Url.Action("Edit", "Chats")',
+                    type: 'POST',
+                    data: formData,
+                    success: function (result) {
+                        if (result.success) {
+                            $('#editChatModal').modal('hide');
+                            location.reload();
+                        } else {
+                            alert("Failed to edit chat.");
+                        }
+                    }
+                });
+            });
+
+            // Обработка отправки сообщений
+            $('#sendMessageForm').on('submit', function (event) {
+                event.preventDefault();
+                var chatId = $('#chatId').val();
+                var messageContent = $('#messageContent').val();
+
+                $.ajax({
+                    url: '@Url.Action("SendMessage", "Chats")',
+                    type: 'POST',
+                    data: { chatId: chatId, content: messageContent },
+                    success: function (result) {
+                        if (result.success) {
+                            $('#messageContent').val('');
+                            var newMessage = `
+                                        <div class="chat-message mb-2">
+                                            <strong>${'@User.Identity.Name'}</strong>
+                                            <p>${messageContent}</p>
+                                            <small>${new Date().toLocaleString()}</small>
+                                        </div>`;
+                            $('#chatMessages').append(newMessage);
+                            $('#chatMessages').scrollTop($('#chatMessages')[0].scrollHeight);
+                        } else {
+                            alert("Failed to send message.");
+                        }
+                    }
+                });
+            });
+
+            // Обработка удаления участника
+            window.removeParticipant = function (chatId, userId) {
+                if (confirm("Are you sure you want to remove this participant?")) {
+                    $.ajax({
+                        url: '@Url.Action("RemoveParticipant", "Chats")',
+                        type: 'POST',
+                        data: { chatId: chatId, userId: userId },
+                        success: function (result) {
+                            if (result.success) {
+                                location.reload();
+                            } else {
+                                alert("Failed to remove participant.");
+                            }
+                        }
+                    });
+                }
+            }
         });
-
-        function editChat(chatId) {
-            var name = $('#editChatName').val();
-            var description = $('#editChatDescription').val();
-            var iconUrl = $('#editChatIconUrl').val();
-
-            $.ajax({
-                url: '/Chats/Edit',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    Id: chatId,
-                    Name: name,
-                    Description: description,
-                    ChatIconUrl: iconUrl
-                }),
-                success: function (response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert('Failed to edit chat');
-                    }
-                }
-            });
-        }
-
-        function addParticipant(chatId) {
-            var participantId = $('#addParticipant').val();
-
-            $.ajax({
-                url: '/Chats/AddParticipant',
-                method: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    ChatId: chatId,
-                    ParticipantId: participantId
-                }),
-                success: function (response) {
-                    if (response.success) {
-                        location.reload();
-                    } else {
-                        alert('Failed to add participant');
-                    }
-                }
-            });
-        }
     </script>
 }

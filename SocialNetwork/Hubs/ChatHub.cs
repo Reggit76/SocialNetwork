@@ -18,9 +18,9 @@ namespace SocialNetwork.Hubs
         public async Task SendMessage(int chatId, string message)
         {
             var senderId = int.Parse(Context.User.FindFirst("UserId").Value);
-            var userName = Context.User.Identity.Name;
-            _messageService.SendMessageAsync(chatId, senderId, message);
-            await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", userName, message);
+            var user = await _userService.GetUserProfileAsync(senderId);
+            await _messageService.SendMessageAsync(chatId, senderId, message);
+            await Clients.Group(chatId.ToString()).SendAsync("ReceiveMessage", user.FullName, message);
         }
 
         public async Task JoinChat(int chatId)

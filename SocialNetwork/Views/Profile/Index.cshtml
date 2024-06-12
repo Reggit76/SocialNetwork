@@ -2,7 +2,7 @@
 
 @{
     ViewData["Title"] = "Profile";
-    var avatar = Model.ProfilePictureUrl ?? "~/images/default-avatar.jpg";
+    var avatar = Model.ProfilePictureUrl ?? "~/images/default-avatar.png";
 }
 
 <div class="profile-container">
@@ -16,9 +16,9 @@
     </div>
     <div class="profile-details">
         <h3>Details</h3>
-        <p>@Model.DateOfBirth.ToString("d")</p>
-        <p>@Model.Gender</p>
-        <p>@Model.Role</p>
+        <p>Дата рождения: @Model.DateOfBirth.ToString("d")</p>
+        <p>Пол: @Model.Gender</p>
+        <p>Роль: @Model.Role</p>
     </div>
 </div>
 
